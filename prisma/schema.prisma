@@ -1,0 +1,235 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+   binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "postgres"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  HR
+  MANAGER
+  EMPLOYEE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceMethod {
+  WEB
+  MOBILE
+  BIOMETRIC
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(EMPLOYEE)
+  employee     Employee?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+model Employee {
+  id                      String             @id @default(cuid())
+  personNo                String             @unique
+  firstName               String
+  lastName                String
+  workEmail               String             @unique
+  personalEmail           String?            // ✅ NEW: personal email
+  phone                   String?
+  emergencyContact        String?            // ✅ NEW: emergency contact number
+  gender                  String?            // ✅ NEW: gender (Male/Female/Other)
+  address                 String?            // ✅ NEW: residential address
+  educationQualification  String?            // ✅ NEW: education details
+  birthdate               DateTime?          // already exists → used for birthday
+  hireDate                DateTime
+  terminationDate         DateTime?
+  department              String?
+  location                String?
+  status                  String             @default("Active")
+
+  // Manager relationships
+  managerId               String?
+  manager                 Employee?          @relation("ManagerReports", fields: [managerId], references: [id])
+  reports                 Employee[]         @relation("ManagerReports")
+
+  // Associations
+  userId                  String?            @unique
+  user                    User?              @relation(fields: [userId], references: [id])
+  compensation            Compensation?
+  documents               Document[]
+  leaveBalances           LeaveBalance[]
+  leaveRequests           LeaveRequest[]
+  attendance              AttendanceRecord[]
+  payslips                Payslip[]
+
+  insurances              Insurance[]
+
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+}
+
+model Insurance {
+  id             String    @id @default(cuid())
+  employeeId     String
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  policyNumber   String
+  provider       String
+  startDate      DateTime
+  endDate        DateTime
+  coverageAmount Float
+  bonusPercent   Float?      // Increment/bonus reflection
+  ctcFileUrl     String?     // Uploaded CTC sheet URL
+  eCashAmount    Float?      // Paid leave encashment
+  convenienceFee Float?      // Extra allowance or deduction
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Compensation {
+  id          String   @id @default(cuid())
+  employeeId  String   @unique
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  baseSalary  Float
+  currency    String
+  effectiveOn DateTime
+}
+
+model Document {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  title      String
+  type       String
+  storageUrl String
+  sha256     String?
+  uploadedBy String?
+  signedAt   DateTime?
+  expiryDate DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+//
+// ✅ Leave Policy, Balance & Request
+//
+model LeavePolicy {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  description      String?
+  region           String?  @default("IN")
+  accrualPerMonth  Float    @default(1.75)
+  annualQuota      Int?      @default(12)
+  maxCarryForward  Int      @default(12)
+  requiresDocAfter Int      @default(3)
+  carryForward     Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  balances LeaveBalance[]
+  requests LeaveRequest[]
+}
+
+model LeaveBalance {
+  id         String      @id @default(cuid())
+  employeeId String
+  policyId   String
+  period     String       // YYYY-MM
+  allotted   Float        @default(0)   // ✅ Added this line
+  opening    Float        @default(0)
+  accrued    Float        @default(0)
+  used       Float        @default(0)
+  adjusted   Float        @default(0)
+  closing    Float        @default(0)
+  carryOver  Float?       @default(0)
+  employee   Employee     @relation(fields: [employeeId], references: [id])
+  policy     LeavePolicy  @relation(fields: [policyId], references: [id])
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([employeeId, policyId, period])
+}
+
+model LeaveRequest {
+  id         String      @id @default(cuid())
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id])
+  policyId   String
+  policy     LeavePolicy @relation(fields: [policyId], references: [id])
+  startDate  DateTime
+  endDate    DateTime
+  days       Float
+  reason     String?
+  status     LeaveStatus @default(PENDING)
+  halfDay     Boolean   @default(false)
+  approverId String?
+  approvedAt  DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+//
+// ✅ Attendance & Payroll
+//
+model AttendanceRecord {
+  id         String           @id @default(cuid())
+  employeeId String
+  employee   Employee         @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  checkIn    DateTime?
+  checkOut   DateTime?
+  method     AttendanceMethod @default(WEB)
+  notes      String?
+
+  @@unique([employeeId, date])
+}
+
+model PayrollRun {
+  id          String           @id @default(cuid())
+  periodStart DateTime
+  periodEnd   DateTime
+  payDate     DateTime
+  status      PayrollRunStatus @default(DRAFT)
+  createdAt   DateTime         @default(now())
+  payslips    Payslip[]
+}
+
+model Payslip {
+  id           String     @id @default(cuid())
+  payrollRunId String
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
+  employeeId   String
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  gross        Float
+  deductions   Float
+  net          Float
+  currency     String
+  lines        Json
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
+  @@unique([employeeId, payrollRunId])
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String   @unique  // Add @unique constraint
+  date        DateTime
+  description String?
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
