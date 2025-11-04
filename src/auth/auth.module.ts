@@ -10,11 +10,13 @@ import { PrismaService } from '../prisma.service';
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
-    // ✅ Use environment variables instead of hardcoded secret
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: process.env.JWT_SECRET || 'fallback_secret_key',
-        signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
+
+        signOptions: {
+          expiresIn: parseExpiry(process.env.JWT_EXPIRES_IN || '7d'),
+        },
       }),
     }),
   ],
@@ -23,3 +25,23 @@ import { PrismaService } from '../prisma.service';
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
+
+// ✅ Helper function to convert "7d", "1h", etc. into seconds
+function parseExpiry(value: string): number {
+  const match = /^(\d+)([smhd])?$/.exec(value);
+  if (!match) return 7 * 24 * 60 * 60; // default 7 days
+  const num = parseInt(match[1], 10);
+  const unit = match[2];
+  switch (unit) {
+    case 's':
+      return num;
+    case 'm':
+      return num * 60;
+    case 'h':
+      return num * 60 * 60;
+    case 'd':
+      return num * 24 * 60 * 60;
+    default:
+      return num;
+  }
+}
