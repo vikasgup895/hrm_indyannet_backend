@@ -31,7 +31,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
       transform: true,
     }),
   );
@@ -40,11 +40,15 @@ async function bootstrap() {
      ✅ CORS Setup
   ----------------------------------------------------- */
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: [
+      'http://localhost:3000', // frontend dev
+      'https://hrm.indyanet.com', // production
+    ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
+  
 
   /* -----------------------------------------------------
      ✅ Static File Serving

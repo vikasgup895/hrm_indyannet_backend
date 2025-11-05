@@ -43,6 +43,7 @@ model User {
   employee     Employee?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
 }
 model Employee {
   id                      String             @id @default(cuid())
@@ -50,39 +51,55 @@ model Employee {
   firstName               String
   lastName                String
   workEmail               String             @unique
-  personalEmail           String?            // ✅ NEW: personal email
+  personalEmail           String?
   phone                   String?
-  emergencyContact        String?            // ✅ NEW: emergency contact number
-  gender                  String?            // ✅ NEW: gender (Male/Female/Other)
-  address                 String?            // ✅ NEW: residential address
-  educationQualification  String?            // ✅ NEW: education details
-  birthdate               DateTime?          // already exists → used for birthday
+  emergencyContact        String?
+  gender                  String?
+  address                 String?
+  educationQualification  String?
+  birthdate               DateTime?
   hireDate                DateTime
   terminationDate         DateTime?
   department              String?
   location                String?
   status                  String             @default("Active")
 
-  // Manager relationships
   managerId               String?
   manager                 Employee?          @relation("ManagerReports", fields: [managerId], references: [id])
   reports                 Employee[]         @relation("ManagerReports")
 
-  // Associations
   userId                  String?            @unique
   user                    User?              @relation(fields: [userId], references: [id])
+
   compensation            Compensation?
   documents               Document[]
   leaveBalances           LeaveBalance[]
   leaveRequests           LeaveRequest[]
   attendance              AttendanceRecord[]
   payslips                Payslip[]
-
   insurances              Insurance[]
+
+  bankDetail              BankDetail?
 
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
 }
+
+model BankDetail {
+  id              String   @id @default(cuid())
+  employeeId      String   @unique
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  bankName        String
+  accountHolder   String
+  accountNumber   String
+  ifscCode        String
+  branch          String?
+  pfNumber        String?
+  uan             String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 
 model Insurance {
   id             String    @id @default(cuid())

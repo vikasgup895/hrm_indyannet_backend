@@ -81,8 +81,10 @@ async function main() {
   console.log(`✅ ${leavePolicies.length} leave policies created`);
 
   // 🔹 Dynamic Leave Balances
-  const allEmployees = await p.employee.findMany();
-  const allPolicies = await p.leavePolicy.findMany();
+  const allEmployees = await p.employee.findMany({
+    select: { id: true },
+  });
+    const allPolicies = await p.leavePolicy.findMany();
   const currentPeriod = new Date().toISOString().slice(0, 7);
 
   for (const emp of allEmployees) {

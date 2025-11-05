@@ -1,149 +1,64 @@
-// src/employees/employees.service.ts
-import { Injectable } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
-import { Prisma, Employee } from '@prisma/client';
+import { Prisma, Employee, Role } from '@prisma/client';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import {
+  CreateBankDetailDto,
+  UpdateBankDetailDto,
+} from './dto/bank-detail.dto';
 
 @Injectable()
 export class EmployeesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
+  // ────────────────
+  // 1️⃣ List All Employees
+  // ────────────────
   async list(): Promise<Employee[]> {
     return this.prisma.employee.findMany({
       include: {
-        compensation: true,
-        manager: {
-          select: { id: true, firstName: true, lastName: true },
-        },
+        manager: { select: { id: true, firstName: true, lastName: true } },
         documents: true,
+        bankDetail: true,
+        compensation: true,
+        user: { select: { id: true, email: true, role: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
+  // ────────────────
+  // 2️⃣ Get Employee by ID
+  // ────────────────
   async get(id: string): Promise<Employee | null> {
-    return this.prisma.employee.findUnique({
+    const emp = await this.prisma.employee.findUnique({
       where: { id },
       include: {
-        compensation: true,
-        manager: {
-          select: { id: true, firstName: true, lastName: true },
-        },
+        bankDetail: true,
+        manager: { select: { id: true, firstName: true, lastName: true } },
         documents: true,
-      },
-    });
-  }
-
-  // async getCurrentProfile(userId: string): Promise<Employee | null> {
-  //   return this.prisma.employee.findFirst({
-  //     where: { userId },
-  //     include: {
-  //       compensation: true,
-  //       manager: { select: { id: true, firstName: true, lastName: true } },
-  //       user: { select: { email: true, role: true } },
-  //     },
-  //   });
-  // }
-  async getCurrentProfile(userId: string) {
-    const employee = await this.prisma.employee.findFirst({
-      where: { userId },
-      include: {
         compensation: true,
-        manager: {
-          select: { id: true, firstName: true, lastName: true },
-        },
-        user: {
-          select: { email: true, role: true },
-        },
+        user: { select: { id: true, email: true, role: true } },
       },
     });
-
-    // ✅ If not found (e.g., admin), return user info only
-    if (!employee) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, role: true, createdAt: true },
-      });
-
-      return {
-        message: 'No employee profile found — returning user info',
-        user,
-      };
-    }
-
-    return employee;
+    if (!emp) throw new NotFoundException('Employee not found');
+    return emp;
   }
 
-  async changePassword(
-    userId: string,
-    dto: { oldPassword: string; newPassword: string },
-  ) {
-    // Step 1: Find user
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    // Step 2: Verify old password
-    const isValid = await bcrypt.compare(dto.oldPassword, user.passwordHash);
-    if (!isValid) {
-      throw new Error('Old password is incorrect');
-    }
-
-    // Step 3: Hash new password
-    const newHash = await bcrypt.hash(dto.newPassword, 10);
-
-    // Step 4: Update user
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash: newHash },
-    });
-
-    return { message: 'Password updated successfully' };
-  }
-
-  // async create(dto: CreateEmployeeDto): Promise<Employee> {
-  //   const personNo = await this.generatePersonNo();
-
-  //   return this.prisma.employee.create({
-  //     data: {
-  //       personNo,
-  //       firstName: dto.firstName,
-  //       lastName: dto.lastName,
-  //       workEmail: dto.workEmail,
-  //       phone: dto.phone ?? null,
-  //       department: dto.department ?? null,
-  //       location: dto.location ?? null,
-  //       status: dto.status || 'Active',
-  //       hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
-  //       managerId: dto.managerId ?? null,
-  //       compensation: dto.salary
-  //         ? {
-  //             create: {
-  //               baseSalary: parseFloat(dto.salary),
-  //               currency: dto.currency || 'INR',
-  //               effectiveOn: new Date(),
-  //             },
-  //           }
-  //         : undefined,
-  //     },
-  //     include: {
-  //       compensation: true,
-  //       manager: { select: { id: true, firstName: true, lastName: true } },
-  //     },
-  //   });
-  // }
-
-  // src/employees/employees.service.ts
+  // ────────────────
+  // 3️⃣ Create Employee
+  // ────────────────
   async create(dto: CreateEmployeeDto): Promise<Employee> {
     const personNo = await this.generatePersonNo();
 
-    // ✅ Step 1: Create linked User account automatically
     const user = await this.prisma.user.create({
       data: {
         email: dto.workEmail,
@@ -154,59 +69,23 @@ export class EmployeesService {
       },
     });
 
-    // ✅ Step 2: Create Employee and link to User
-    const employee = await this.prisma.employee.create({
+    return this.prisma.employee.create({
       data: {
-        // personNo,
-        // firstName: dto.firstName,
-        // lastName: dto.lastName,
-        // workEmail: dto.workEmail,
-        // phone: dto.phone ?? null,
-        // birthdate: dto.birthdate ? new Date(dto.birthdate) : null,
-        // department: dto.department ?? null,
-        // location: dto.location ?? null,
-        // status: dto.status || 'Active',
-        // hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
-        // managerId: dto.managerId ?? null,
-        // userId: user.id, // ✅ Link Employee to User
-
         personNo,
         firstName: dto.firstName,
         lastName: dto.lastName,
         workEmail: dto.workEmail,
-        personalEmail: dto.personalEmail ?? null, // ✅ NEW
+        personalEmail: dto.personalEmail ?? null,
         phone: dto.phone ?? null,
-        emergencyContact: dto.emergencyContact ?? null, // ✅ NEW
-        address: dto.address ?? null, // ✅ NEW
-        educationQualification: dto.educationQualification ?? null, // ✅ NEW
-        gender: dto.gender ?? null, // ✅ NEW
-        // documentUrl: dto.documentUrl ?? null, // ✅ NEW
-        birthdate: dto.birthdate ? new Date(dto.birthdate) : null,
+        address: dto.address ?? null,
         department: dto.department ?? null,
         location: dto.location ?? null,
         status: dto.status || 'Active',
         hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
         managerId: dto.managerId ?? null,
         userId: user.id,
-
-        compensation: dto.salary
-          ? {
-              create: {
-                baseSalary: parseFloat(dto.salary),
-                currency: dto.currency || 'INR',
-                effectiveOn: new Date(),
-              },
-            }
-          : undefined,
-      },
-      include: {
-        compensation: true,
-        manager: { select: { id: true, firstName: true, lastName: true } },
-        documents: true,
       },
     });
-
-    return employee;
   }
 
   private async hashPassword(password: string): Promise<string> {
@@ -214,54 +93,163 @@ export class EmployeesService {
     return bcrypt.hash(password, salt);
   }
 
-  async update(id: string, dto: UpdateEmployeeDto): Promise<Employee> {
-    return this.prisma.employee.update({
-      where: { id },
-      data: dto as Prisma.EmployeeUpdateInput,
+ 
+// 4️⃣ Update Employee or Self (Fixed Bank Detail Handling)
+// ────────────────
+async update(
+  id: string,
+  dto: UpdateEmployeeDto,
+  currentUser?: any,
+): Promise<Employee> {
+  const employee = await this.prisma.employee.findUnique({
+    where: { id },
+    include: { bankDetail: true },
+  });
+
+  if (!employee) throw new NotFoundException('Employee not found');
+
+  const role = currentUser?.role ?? null;
+  const isAdminOrHR =
+    role === Role.ADMIN || role === 'ADMIN' || role === 'HR';
+  const isOwner =
+    currentUser?.employeeId === id || currentUser?.id === employee.userId;
+
+  if (!isAdminOrHR && !isOwner) {
+    throw new ForbiddenException('Not authorized to update this profile');
+  }
+
+  // ✅ Normalize flat bank fields into dto.bankDetail
+  if (!(dto as any).bankDetail) {
+    const bankKeys = [
+      'bankName',
+      'accountHolder',
+      'accountNumber',
+      'ifscCode',
+      'branch',
+      'branchName',
+      'pfNumber',
+      'uan',
+      'uanNumber',
+    ];
+    const hasBankData = bankKeys.some((k) => (dto as any)[k] !== undefined);
+    if (hasBankData) {
+      (dto as any).bankDetail = {
+        bankName: (dto as any).bankName,
+        accountHolder:
+          (dto as any).accountHolder ??
+          `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
+        accountNumber: (dto as any).accountNumber,
+        ifscCode: (dto as any).ifscCode,
+        branch: (dto as any).branch || (dto as any).branchName,
+        pfNumber: (dto as any).pfNumber,
+        uan: (dto as any).uan || (dto as any).uanNumber,
+      };
+    }
+  //  console.log("🟦 Normalized bankDetail object:", (dto as any).bankDetail); // ✅ Add this
+  }
+
+  // ✅ Handle bank detail upsert
+  // employees.service.ts (inside update method)
+  if (dto.bankDetail) {
+    const bd = dto.bankDetail;
+   // console.log('🟩 Upserting bankDetail for employee:', id);
+  
+    await this.prisma.bankDetail.upsert({
+      where: { employeeId: id },
+      create: {
+        employee: { connect: { id } }, // ✅ Connect relation
+        bankName: bd.bankName!,
+        accountHolder:
+          bd.accountHolder ??
+          `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
+        accountNumber: bd.accountNumber!,
+        ifscCode: bd.ifscCode!,
+        branch: bd.branch ?? null,
+        pfNumber: bd.pfNumber ?? null,
+        uan: bd.uan ?? null,
+      },
+      update: {
+        bankName: bd.bankName ?? undefined,
+        accountHolder: bd.accountHolder ?? undefined,
+        accountNumber: bd.accountNumber ?? undefined,
+        ifscCode: bd.ifscCode ?? undefined,
+        branch: bd.branch ?? undefined,
+        pfNumber: bd.pfNumber ?? undefined,
+        uan: bd.uan ?? undefined,
+      },
+    });
+  
+    delete (dto as any).bankDetail;
+  }
+  
+
+  // ✅ Update employee main record
+  const updatedEmployee = await this.prisma.employee.update({
+    where: { id },
+    data: dto as Prisma.EmployeeUpdateInput,
+    include: {
+      manager: { select: { id: true, firstName: true, lastName: true } },
+      bankDetail: true,
+      user: { select: { id: true, email: true, role: true } },
+    },
+  });
+
+  return updatedEmployee;
+}
+
+
+  // ────────────────
+  // 5️⃣ Find Employee by User ID
+  // ────────────────
+  async findByUserId(userId: string) {
+    return this.prisma.employee.findUnique({
+      where: { userId },
       include: {
+        bankDetail: true,
+        documents: true,
         compensation: true,
         manager: { select: { id: true, firstName: true, lastName: true } },
+        user: { select: { id: true, email: true, role: true } },
       },
     });
   }
 
+  // ────────────────
+  // 6️⃣ Add Document
+  // ────────────────
   async addDocument(employeeId: string, filePath: string, uploadedBy?: string) {
-    // Step 1: Validate that employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
     });
+    if (!employee) throw new NotFoundException('Employee not found');
 
-    if (!employee) {
-      throw new Error('Employee not found');
-    }
+    const fileName = filePath.split('/').pop() ?? filePath;
+    const ext = fileName.split('.').pop() ?? '';
 
-    // Step 2: Extract file info
-    const fileName = filePath.split('/').pop() ?? 'employee_doc';
-    const fileExt = fileName.split('.').pop() ?? 'unknown';
-
-    // Step 3: Create Document entry
     const document = await this.prisma.document.create({
       data: {
         employeeId,
         title: fileName,
-        type: fileExt,
-        storageUrl: filePath, // ✅ local path; replace with S3 URL if needed
+        type: ext,
+        storageUrl: filePath,
         uploadedBy: uploadedBy ?? 'System',
       },
     });
 
-    return {
-      message: 'Document uploaded and linked successfully',
-      document,
-    };
+    return { message: 'Document uploaded and linked successfully', document };
   }
 
+  // ────────────────
+  // 7️⃣ Generate Employee Code
+  // ────────────────
   private async generatePersonNo(): Promise<string> {
     const count = await this.prisma.employee.count();
-    return `E-${String(count + 1).padStart(4, '0')}`;
+    return `EMP${(10000 + count + 1).toString().slice(1)}`;
   }
 
-  // ✅ Simple clean list for dropdowns and HR modules
+  // ────────────────
+  // 8️⃣ Basic List for Dropdowns
+  // ────────────────
   async getAllBasic() {
     return this.prisma.employee.findMany({
       select: {

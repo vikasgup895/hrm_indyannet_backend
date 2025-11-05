@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 // src/employees/dto/update-employee.dto.ts
 import {
   IsEnum,
@@ -6,9 +5,12 @@ import {
   IsString,
   IsEmail,
   IsDateString,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { EmployeeStatusDto } from './create-employee.dto';
 import { GenderDto } from './create-employee.dto';
+import { UpdateBankDetailDto } from './bank-detail.dto';
 
 export class UpdateEmployeeDto {
   @IsOptional()
@@ -66,4 +68,10 @@ export class UpdateEmployeeDto {
   @IsOptional()
   @IsString()
   documentUrl?: string;
+
+  // allow patching/adding a single bank detail (one-to-one)
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdateBankDetailDto)
+  bankDetail?: UpdateBankDetailDto;
 }

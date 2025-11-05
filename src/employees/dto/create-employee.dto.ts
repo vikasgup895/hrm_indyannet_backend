@@ -6,7 +6,11 @@ import {
   IsEmail,
   IsDateString,
   IsNumberString,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { CreateBankDetailDto } from './bank-detail.dto';
 
 export enum EmployeeStatusDto {
   ACTIVE = 'Active',
@@ -20,7 +24,9 @@ export enum GenderDto {
 }
 
 export class CreateEmployeeDto {
-  // --- Personal Information ---
+  // --- Basic / Personal ---
+  // NOTE: personNo is intentionally NOT present here — backend will generate it
+
   @IsString()
   firstName: string;
 
@@ -32,7 +38,7 @@ export class CreateEmployeeDto {
 
   @IsOptional()
   @IsEmail()
-  personalEmail?: string; // ✅ NEW
+  personalEmail?: string;
 
   @IsOptional()
   @IsString()
@@ -40,23 +46,27 @@ export class CreateEmployeeDto {
 
   @IsOptional()
   @IsString()
-  emergencyContact?: string; // ✅ NEW
+  emergencyContact?: string;
 
   @IsOptional()
   @IsString()
-  address?: string; // ✅ NEW
+  address?: string;
 
   @IsOptional()
   @IsString()
-  educationQualification?: string; // ✅ NEW
+  educationQualification?: string;
 
   @IsOptional()
   @IsEnum(GenderDto)
-  gender?: GenderDto; // ✅ NEW
+  gender?: GenderDto;
 
   @IsOptional()
   @IsDateString()
   birthdate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  hireDate?: string;
 
   @IsOptional()
   @IsString()
@@ -71,44 +81,21 @@ export class CreateEmployeeDto {
   status?: EmployeeStatusDto;
 
   @IsOptional()
-  @IsDateString()
-  hireDate?: string;
-
-  @IsOptional()
   @IsString()
   managerId?: string;
 
   @IsOptional()
   @IsString()
-  documentUrl?: string; // ✅ NEW (uploaded doc URL or path)
+  documentUrl?: string;
 
   // --- Compensation ---
-  @IsOptional()
-  @IsNumberString()
-  salary?: string;
+  // If you want admins to be able to send salary at creation, add salary/currency here.
+  // For now we keep them out because your service may create Compensation separately.
 
+  // --- Optional: nested bank details array (if you support upserting bank details at creation) ---
   @IsOptional()
-  @IsString()
-  currency?: string;
-
-  // --- (Optional Extra Payroll Fields — keep if you plan to use later) ---
-  @IsOptional()
-  @IsString()
-  bankName?: string;
-
-  @IsOptional()
-  @IsString()
-  accountNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  ifscCode?: string;
-
-  @IsOptional()
-  @IsString()
-  panNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  pfEsi?: string;
+@IsArray()
+@ValidateNested({ each: true })
+@Type(() => CreateBankDetailDto)
+bankDetails?: CreateBankDetailDto[];
 }
