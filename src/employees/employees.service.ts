@@ -14,10 +14,14 @@ import {
   CreateBankDetailDto,
   UpdateBankDetailDto,
 } from './dto/bank-detail.dto';
+import { MailerService } from '../mailer/mailer.service'; // << ADD THIS
 
 @Injectable()
 export class EmployeesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+     private readonly mailer: MailerService
+    ) { }
 
   // ────────────────
   // 1️⃣ List All Employees
@@ -58,7 +62,7 @@ export class EmployeesService {
   // ────────────────
   async create(dto: CreateEmployeeDto): Promise<Employee> {
     const personNo = await this.generatePersonNo();
-
+  
     const user = await this.prisma.user.create({
       data: {
         email: dto.workEmail,
@@ -68,8 +72,8 @@ export class EmployeesService {
         role: 'EMPLOYEE',
       },
     });
-
-    return this.prisma.employee.create({
+  
+    const employee = await this.prisma.employee.create({
       data: {
         personNo,
         firstName: dto.firstName,
@@ -86,116 +90,167 @@ export class EmployeesService {
         userId: user.id,
       },
     });
+  
+    // ✅ Send email AFTER employee is created but BEFORE returning
+    await this.mailer.send(
+      dto.workEmail,
+      'Welcome to Indyanet HRM – Your Account Credentials',
+      `
+      <div style="font-family: Arial, Helvetica, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px;">
+        <div style="text-align: center; border-bottom: 1px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px;">
+          <h2 style="color: #2b6cb0; margin: 0;">Indyanet HRM</h2>
+          <p style="margin: 4px 0; font-size: 14px; color: #666;">Human Resource Management System</p>
+        </div>
+    
+        <p>Dear <strong>${dto.firstName}</strong>,</p>
+    
+        <p>Welcome to <strong>Indyanet HRM</strong>! Your employee account has been successfully created. Please find your login credentials below:</p>
+    
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <tr>
+            <td style="padding: 8px; background: #f8f9fa; border: 1px solid #ddd;"><strong>Login Email</strong></td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${dto.workEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; background: #f8f9fa; border: 1px solid #ddd;"><strong>Temporary Password</strong></td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${process.env.DEFAULT_EMPLOYEE_PASSWORD}</td>
+          </tr>
+        </table>
+    
+        <p>
+          You can log in to your HRM portal here:<br/>
+          <a href="https://hrm.indyanet.com" style="color: #2b6cb0; text-decoration: none; font-weight: bold;">
+            https://hrm.indyanet.com
+          </a>
+        </p>
+    
+        <p><strong>Important:</strong> For security reasons, please change your password immediately after your first login.</p>
+    
+        <p>We’re glad to have you on board. If you face any issues accessing your account, please contact the HR department.</p>
+    
+        <div style="border-top: 1px solid #e0e0e0; margin-top: 30px; padding-top: 10px; font-size: 13px; color: #777;">
+          <p style="margin: 0;">Best Regards,<br/>
+          <strong>HR Team</strong><br/>
+          Indyanet HRM</p>
+          <p style="margin-top: 6px; color: #999;">This is an automated email. Please do not reply.</p>
+        </div>
+      </div>
+      `
+    );
+    
+  
+    return employee; // ✅ finally return employee
   }
+  
 
   private async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt(10);
     return bcrypt.hash(password, salt);
   }
 
- 
-// 4️⃣ Update Employee or Self (Fixed Bank Detail Handling)
-// ────────────────
-async update(
-  id: string,
-  dto: UpdateEmployeeDto,
-  currentUser?: any,
-): Promise<Employee> {
-  const employee = await this.prisma.employee.findUnique({
-    where: { id },
-    include: { bankDetail: true },
-  });
 
-  if (!employee) throw new NotFoundException('Employee not found');
+  // 4️⃣ Update Employee or Self (Fixed Bank Detail Handling)
+  // ────────────────
+  async update(
+    id: string,
+    dto: UpdateEmployeeDto,
+    currentUser?: any,
+  ): Promise<Employee> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+      include: { bankDetail: true },
+    });
 
-  const role = currentUser?.role ?? null;
-  const isAdminOrHR =
-    role === Role.ADMIN || role === 'ADMIN' || role === 'HR';
-  const isOwner =
-    currentUser?.employeeId === id || currentUser?.id === employee.userId;
+    if (!employee) throw new NotFoundException('Employee not found');
 
-  if (!isAdminOrHR && !isOwner) {
-    throw new ForbiddenException('Not authorized to update this profile');
-  }
+    const role = currentUser?.role ?? null;
+    const isAdminOrHR =
+      role === Role.ADMIN || role === 'ADMIN' || role === 'HR';
+    const isOwner =
+      currentUser?.employeeId === id || currentUser?.id === employee.userId;
 
-  // ✅ Normalize flat bank fields into dto.bankDetail
-  if (!(dto as any).bankDetail) {
-    const bankKeys = [
-      'bankName',
-      'accountHolder',
-      'accountNumber',
-      'ifscCode',
-      'branch',
-      'branchName',
-      'pfNumber',
-      'uan',
-      'uanNumber',
-    ];
-    const hasBankData = bankKeys.some((k) => (dto as any)[k] !== undefined);
-    if (hasBankData) {
-      (dto as any).bankDetail = {
-        bankName: (dto as any).bankName,
-        accountHolder:
-          (dto as any).accountHolder ??
-          `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
-        accountNumber: (dto as any).accountNumber,
-        ifscCode: (dto as any).ifscCode,
-        branch: (dto as any).branch || (dto as any).branchName,
-        pfNumber: (dto as any).pfNumber,
-        uan: (dto as any).uan || (dto as any).uanNumber,
-      };
+    if (!isAdminOrHR && !isOwner) {
+      throw new ForbiddenException('Not authorized to update this profile');
     }
-  //  console.log("🟦 Normalized bankDetail object:", (dto as any).bankDetail); // ✅ Add this
-  }
 
-  // ✅ Handle bank detail upsert
-  // employees.service.ts (inside update method)
-  if (dto.bankDetail) {
-    const bd = dto.bankDetail;
-   // console.log('🟩 Upserting bankDetail for employee:', id);
-  
-    await this.prisma.bankDetail.upsert({
-      where: { employeeId: id },
-      create: {
-        employee: { connect: { id } }, // ✅ Connect relation
-        bankName: bd.bankName!,
-        accountHolder:
-          bd.accountHolder ??
-          `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
-        accountNumber: bd.accountNumber!,
-        ifscCode: bd.ifscCode!,
-        branch: bd.branch ?? null,
-        pfNumber: bd.pfNumber ?? null,
-        uan: bd.uan ?? null,
-      },
-      update: {
-        bankName: bd.bankName ?? undefined,
-        accountHolder: bd.accountHolder ?? undefined,
-        accountNumber: bd.accountNumber ?? undefined,
-        ifscCode: bd.ifscCode ?? undefined,
-        branch: bd.branch ?? undefined,
-        pfNumber: bd.pfNumber ?? undefined,
-        uan: bd.uan ?? undefined,
+    // ✅ Normalize flat bank fields into dto.bankDetail
+    if (!(dto as any).bankDetail) {
+      const bankKeys = [
+        'bankName',
+        'accountHolder',
+        'accountNumber',
+        'ifscCode',
+        'branch',
+        'branchName',
+        'pfNumber',
+        'uan',
+        'uanNumber',
+      ];
+      const hasBankData = bankKeys.some((k) => (dto as any)[k] !== undefined);
+      if (hasBankData) {
+        (dto as any).bankDetail = {
+          bankName: (dto as any).bankName,
+          accountHolder:
+            (dto as any).accountHolder ??
+            `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
+          accountNumber: (dto as any).accountNumber,
+          ifscCode: (dto as any).ifscCode,
+          branch: (dto as any).branch || (dto as any).branchName,
+          pfNumber: (dto as any).pfNumber,
+          uan: (dto as any).uan || (dto as any).uanNumber,
+        };
+      }
+      //  console.log("🟦 Normalized bankDetail object:", (dto as any).bankDetail); // ✅ Add this
+    }
+
+    // ✅ Handle bank detail upsert
+    // employees.service.ts (inside update method)
+    if (dto.bankDetail) {
+      const bd = dto.bankDetail;
+      // console.log('🟩 Upserting bankDetail for employee:', id);
+
+      await this.prisma.bankDetail.upsert({
+        where: { employeeId: id },
+        create: {
+          employee: { connect: { id } }, // ✅ Connect relation
+          bankName: bd.bankName!,
+          accountHolder:
+            bd.accountHolder ??
+            `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
+          accountNumber: bd.accountNumber!,
+          ifscCode: bd.ifscCode!,
+          branch: bd.branch ?? null,
+          pfNumber: bd.pfNumber ?? null,
+          uan: bd.uan ?? null,
+        },
+        update: {
+          bankName: bd.bankName ?? undefined,
+          accountHolder: bd.accountHolder ?? undefined,
+          accountNumber: bd.accountNumber ?? undefined,
+          ifscCode: bd.ifscCode ?? undefined,
+          branch: bd.branch ?? undefined,
+          pfNumber: bd.pfNumber ?? undefined,
+          uan: bd.uan ?? undefined,
+        },
+      });
+
+      delete (dto as any).bankDetail;
+    }
+
+
+    // ✅ Update employee main record
+    const updatedEmployee = await this.prisma.employee.update({
+      where: { id },
+      data: dto as Prisma.EmployeeUpdateInput,
+      include: {
+        manager: { select: { id: true, firstName: true, lastName: true } },
+        bankDetail: true,
+        user: { select: { id: true, email: true, role: true } },
       },
     });
-  
-    delete (dto as any).bankDetail;
+
+    return updatedEmployee;
   }
-  
-
-  // ✅ Update employee main record
-  const updatedEmployee = await this.prisma.employee.update({
-    where: { id },
-    data: dto as Prisma.EmployeeUpdateInput,
-    include: {
-      manager: { select: { id: true, firstName: true, lastName: true } },
-      bankDetail: true,
-      user: { select: { id: true, email: true, role: true } },
-    },
-  });
-
-  return updatedEmployee;
-}
 
 
   // ────────────────

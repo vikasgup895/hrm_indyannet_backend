@@ -173,57 +173,9 @@ async function main() {
     },
   });
 
-  let run;
-  if (!existingRun) {
-    run = await p.payrollRun.create({
-      data: {
-        periodStart: currentMonthStart,
-        periodEnd: currentMonthEnd,
-        payDate: nextPayDate,
-        status: 'APPROVED',
-      },
-    });
-    console.log(
-      `✅ Payroll run created for ${currentMonthStart.toLocaleString(
-        'default',
-        {
-          month: 'long',
-          year: 'numeric',
-        },
-      )}`,
-    );
-  } else {
-    run = existingRun;
-    console.log('ℹ️ Payroll run for current month already exists, skipping');
-  }
-
+  
   // 🔹 Generate Payslips for Each Employee
-  for (const emp of allEmployees) {
-    const gross = Math.floor(80000 + Math.random() * 20000);
-    const deductions = Math.floor(gross * 0.1);
-    const net = gross - deductions;
-
-    await p.payslip.upsert({
-      where: {
-        employeeId_payrollRunId: { employeeId: emp.id, payrollRunId: run.id },
-      },
-      update: { gross, deductions, net, currency: 'INR' },
-      create: {
-        employeeId: emp.id,
-        payrollRunId: run.id,
-        gross,
-        deductions,
-        net,
-        currency: 'INR',
-        lines: [
-          { label: 'Base Salary', amount: gross },
-          { label: 'Deductions', amount: deductions },
-          { label: 'Net Pay', amount: net },
-        ],
-      },
-    });
-  }
-  console.log(`✅ Payslips generated for ${allEmployees.length} employees`);
+  
 
   console.log('\n🎉 Seeding completed successfully!');
   console.log('🧠 Summary:');

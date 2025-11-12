@@ -30,20 +30,11 @@ export class PayrollController {
 
   // 👑 Admin manually generates payslip for one employee
   @Roles('HR', 'ADMIN')
-  @Post('generate')
-  generatePayslip(
-    @Body()
-    body: {
-      employeeId: string;
-      runId: string;
-      gross: number;
-      deductions?: number;
-      net: number;
-      currency?: string;
-    },
-  ) {
-    return this.svc.generatePayslipForEmployee(body);
+  @Post("generate")
+  async generatePayslip(@Body() body: any, @Req() req: any) {
+    return this.svc.generatePayslipForEmployee(body, req.user);
   }
+  
 
   // 📤 Publish payroll run — auto-generate payslips for all employees
   @Roles('HR', 'ADMIN')

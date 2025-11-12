@@ -8,6 +8,7 @@ import { LeaveModule } from './leave/leave.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { InsuranceModule } from './insurance/insurance.module';
+import { MailerModule } from './mailer/mailer.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { InsuranceModule } from './insurance/insurance.module';
     EmployeesModule,
     LeaveModule,
     PayrollModule,
+    MailerModule,  
     InsuranceModule,
     DashboardModule,
   ],

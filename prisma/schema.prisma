@@ -41,6 +41,7 @@ model User {
   passwordHash String
   role         Role      @default(EMPLOYEE)
   employee     Employee?
+  emailSent    Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -226,20 +227,38 @@ model PayrollRun {
 }
 
 model Payslip {
-  id           String     @id @default(cuid())
-  payrollRunId String
-  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
-  employeeId   String
-  employee     Employee   @relation(fields: [employeeId], references: [id])
-  gross        Float
-  deductions   Float
-  net          Float
-  currency     String
-  lines        Json
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @default(now()) @updatedAt
-  @@unique([employeeId, payrollRunId])
+  id            String   @id @default(cuid())
+  employeeId    String
+  payrollRunId  String
+  gross         Float
+  deductions    Float
+  net           Float
+  currency      String   @default("INR")
+  status        String   @default("DRAFT")
+
+  // 🧾 Detailed Breakdown
+  basic             Float? @default(0)
+  hra               Float? @default(0)
+  conveyance        Float? @default(0)
+  medical           Float? @default(0)
+  bonus             Float? @default(0)
+  otherEarnings     Float? @default(0)
+  epf               Float? @default(0)
+  professionalTax   Float? @default(0)
+  otherDeductions   Float? @default(0)
+   
+  lines Json?   
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  payrollRun     PayrollRun @relation(fields: [payrollRunId], references: [id])
+
+  @@unique([employeeId, payrollRunId], name: "employeeId_payrollRunId") 
+
 }
+
 
 model Holiday {
   id          String   @id @default(cuid())

@@ -15,7 +15,7 @@ import { PrismaService } from '../prisma.service';
         secret: process.env.JWT_SECRET || 'fallback_secret_key',
 
         signOptions: {
-          expiresIn: parseExpiry(process.env.JWT_EXPIRES_IN || '7d'),
+          expiresIn: parseExpiry(process.env.JWT_EXPIRES_IN || '7h'),
         },
       }),
     }),
