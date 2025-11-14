@@ -60,38 +60,68 @@ export class EmployeesService {
   // ────────────────
   // 3️⃣ Create Employee
   // ────────────────
-  async create(dto: CreateEmployeeDto): Promise<Employee> {
-    const personNo = await this.generatePersonNo();
+async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
+
+  const existingUser = await this.prisma.user.findUnique({
+    where: { email: dto.workEmail },
+  });
   
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.workEmail,
-        passwordHash: await this.hashPassword(
-          process.env.DEFAULT_EMPLOYEE_PASSWORD || 'password123',
-        ),
-        role: 'EMPLOYEE',
-      },
-    });
+  if (existingUser) {
+    throw new BadRequestException('A user with this email already exists');
+  }
+  const personNo = await this.generatePersonNo();
+
+  // 1. Create User Login
+  const user = await this.prisma.user.create({
+    data: {
+      email: dto.workEmail,
+      passwordHash: await this.hashPassword(
+        process.env.DEFAULT_EMPLOYEE_PASSWORD || 'password123',
+      ),
+      role: dto.role || Role.EMPLOYEE,   // ✔️ Use selected role (enum)
+    },
+  });
   
+  // Only ADMIN can create HR
+  if (dto.role === Role.HR && currentUser?.role !== Role.ADMIN) {
+    throw new ForbiddenException('Only admin can create HR accounts');
+  }
+  
+  // Only ADMIN can create ADMIN
+  if (dto.role === Role.ADMIN && currentUser?.role !== Role.ADMIN) {
+    throw new ForbiddenException('Only admin can create admin accounts');
+  }
+
+  
+    // 2. Create Employee Record (saving ALL fields)
     const employee = await this.prisma.employee.create({
       data: {
         personNo,
         firstName: dto.firstName,
         lastName: dto.lastName,
         workEmail: dto.workEmail,
+  
+        // 🔥 THESE FIELDS WERE NOT SAVED BEFORE — FIXED NOW
         personalEmail: dto.personalEmail ?? null,
         phone: dto.phone ?? null,
+        emergencyContact: dto.emergencyContact ?? null,
+        gender: dto.gender ?? null,
         address: dto.address ?? null,
+        educationQualification: dto.educationQualification ?? null,
+  
+        birthdate: dto.birthdate ? new Date(dto.birthdate) : null,
+        hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
+  
         department: dto.department ?? null,
         location: dto.location ?? null,
-        status: dto.status || 'Active',
-        hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
+        status: dto.status ?? 'Active',
+  
         managerId: dto.managerId ?? null,
         userId: user.id,
       },
     });
   
-    // ✅ Send email AFTER employee is created but BEFORE returning
+    // 3. Send Email After Creation
     await this.mailer.send(
       dto.workEmail,
       'Welcome to Indyanet HRM – Your Account Credentials',
@@ -101,11 +131,11 @@ export class EmployeesService {
           <h2 style="color: #2b6cb0; margin: 0;">Indyanet HRM</h2>
           <p style="margin: 4px 0; font-size: 14px; color: #666;">Human Resource Management System</p>
         </div>
-    
+  
         <p>Dear <strong>${dto.firstName}</strong>,</p>
-    
+  
         <p>Welcome to <strong>Indyanet HRM</strong>! Your employee account has been successfully created. Please find your login credentials below:</p>
-    
+  
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr>
             <td style="padding: 8px; background: #f8f9fa; border: 1px solid #ddd;"><strong>Login Email</strong></td>
@@ -116,18 +146,18 @@ export class EmployeesService {
             <td style="padding: 8px; border: 1px solid #ddd;">${process.env.DEFAULT_EMPLOYEE_PASSWORD}</td>
           </tr>
         </table>
-    
+  
         <p>
           You can log in to your HRM portal here:<br/>
           <a href="https://hrm.indyanet.com" style="color: #2b6cb0; text-decoration: none; font-weight: bold;">
             https://hrm.indyanet.com
           </a>
         </p>
-    
-        <p><strong>Important:</strong> For security reasons, please change your password immediately after your first login.</p>
-    
-        <p>We’re glad to have you on board. If you face any issues accessing your account, please contact the HR department.</p>
-    
+  
+        <p><strong>Important:</strong> Please change your password immediately after your first login.</p>
+  
+        <p>We’re glad to have you on board. If you face any issues accessing your account, contact the HR department.</p>
+  
         <div style="border-top: 1px solid #e0e0e0; margin-top: 30px; padding-top: 10px; font-size: 13px; color: #777;">
           <p style="margin: 0;">Best Regards,<br/>
           <strong>HR Team</strong><br/>
@@ -137,10 +167,10 @@ export class EmployeesService {
       </div>
       `
     );
-    
   
-    return employee; // ✅ finally return employee
+    return employee;
   }
+  
   
 
   private async hashPassword(password: string): Promise<string> {
@@ -156,28 +186,32 @@ export class EmployeesService {
     dto: UpdateEmployeeDto,
     currentUser?: any,
   ): Promise<Employee> {
+  
     const employee = await this.prisma.employee.findUnique({
       where: { id },
       include: { bankDetail: true },
     });
-
+  
     if (!employee) throw new NotFoundException('Employee not found');
-
+  
     const role = currentUser?.role ?? null;
     const isAdminOrHR =
       role === Role.ADMIN || role === 'ADMIN' || role === 'HR';
     const isOwner =
       currentUser?.employeeId === id || currentUser?.id === employee.userId;
-
+  
     if (!isAdminOrHR && !isOwner) {
       throw new ForbiddenException('Not authorized to update this profile');
     }
-
-    // ✅ Normalize flat bank fields into dto.bankDetail
-    if (!(dto as any).bankDetail) {
+  
+    //
+    // ───────────────────────────────────────────────
+    // NORMALIZE BANK DETAIL FIELDS
+    // ───────────────────────────────────────────────
+    //
+    if (!dto.bankDetail) {
       const bankKeys = [
         'bankName',
-        'accountHolder',
         'accountNumber',
         'ifscCode',
         'branch',
@@ -186,59 +220,81 @@ export class EmployeesService {
         'uan',
         'uanNumber',
       ];
-      const hasBankData = bankKeys.some((k) => (dto as any)[k] !== undefined);
-      if (hasBankData) {
-        (dto as any).bankDetail = {
+  
+      const hasBankFields = bankKeys.some((k) => (dto as any)[k] !== undefined);
+  
+      if (hasBankFields) {
+        dto.bankDetail = {
           bankName: (dto as any).bankName,
-          accountHolder:
-            (dto as any).accountHolder ??
-            `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
           accountNumber: (dto as any).accountNumber,
           ifscCode: (dto as any).ifscCode,
           branch: (dto as any).branch || (dto as any).branchName,
           pfNumber: (dto as any).pfNumber,
           uan: (dto as any).uan || (dto as any).uanNumber,
+          accountHolder:
+            employee.firstName && employee.lastName
+              ? `${employee.firstName} ${employee.lastName}`
+              : undefined,
         };
       }
-      //  console.log("🟦 Normalized bankDetail object:", (dto as any).bankDetail); // ✅ Add this
     }
-
-    // ✅ Handle bank detail upsert
-    // employees.service.ts (inside update method)
+  
+    //
+    // ───────────────────────────────────────────────
+    // HANDLE BANKDETAIL UPSERT
+    // ───────────────────────────────────────────────
+    //
     if (dto.bankDetail) {
       const bd = dto.bankDetail;
-      // console.log('🟩 Upserting bankDetail for employee:', id);
-
+  
       await this.prisma.bankDetail.upsert({
         where: { employeeId: id },
         create: {
-          employee: { connect: { id } }, // ✅ Connect relation
-          bankName: bd.bankName!,
-          accountHolder:
-            bd.accountHolder ??
-            `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
-          accountNumber: bd.accountNumber!,
-          ifscCode: bd.ifscCode!,
+          employee: { connect: { id } },
+          bankName: bd.bankName ?? "",
+          accountNumber: bd.accountNumber ?? "",
+          ifscCode: bd.ifscCode ?? "",
           branch: bd.branch ?? null,
           pfNumber: bd.pfNumber ?? null,
           uan: bd.uan ?? null,
+          accountHolder:
+            bd.accountHolder ??
+            `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
         },
         update: {
           bankName: bd.bankName ?? undefined,
-          accountHolder: bd.accountHolder ?? undefined,
           accountNumber: bd.accountNumber ?? undefined,
           ifscCode: bd.ifscCode ?? undefined,
           branch: bd.branch ?? undefined,
           pfNumber: bd.pfNumber ?? undefined,
           uan: bd.uan ?? undefined,
+          accountHolder:
+            bd.accountHolder ??
+            `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
         },
       });
-
+  
       delete (dto as any).bankDetail;
     }
-
-
-    // ✅ Update employee main record
+  
+    //
+    // ───────────────────────────────────────────────
+    // PREVENT EMPLOYEE (NON-HR) FROM UPDATING LOCKED FIELDS
+    // ───────────────────────────────────────────────
+    //
+    if (!isAdminOrHR) {
+      delete dto.firstName;
+      delete dto.lastName;
+      delete dto.workEmail;
+      delete dto.department;
+      delete dto.status; // Employees cannot change status
+    }
+  
+    //
+    // ───────────────────────────────────────────────
+    // UPDATE EMPLOYEE
+    // ───────────────────────────────────────────────
+    //
     const updatedEmployee = await this.prisma.employee.update({
       where: { id },
       data: dto as Prisma.EmployeeUpdateInput,
@@ -248,10 +304,44 @@ export class EmployeesService {
         user: { select: { id: true, email: true, role: true } },
       },
     });
-
+  
     return updatedEmployee;
   }
+  
+  async deleteEmployee(id: string) {
 
+    // 🔥 1. Remove manager assignments (clear managerId on subordinates)
+    await this.prisma.employee.updateMany({
+      where: { managerId: id },
+      data: { managerId: null },
+    });
+  
+    // 🔥 2. Delete 1:1 relations
+    await this.prisma.bankDetail.deleteMany({ where: { employeeId: id } });
+    await this.prisma.compensation.deleteMany({ where: { employeeId: id } });
+  
+    // 🔥 3. Delete 1:N relations
+    await this.prisma.document.deleteMany({ where: { employeeId: id } });
+    await this.prisma.insurance.deleteMany({ where: { employeeId: id } });
+    await this.prisma.leaveBalance.deleteMany({ where: { employeeId: id } });
+    await this.prisma.leaveRequest.deleteMany({ where: { employeeId: id } });
+    await this.prisma.attendanceRecord.deleteMany({
+      where: { employeeId: id },
+    });
+    await this.prisma.payslip.deleteMany({ where: { employeeId: id } });
+  
+    // 🔥 4. Delete User record if exists
+    await this.prisma.user.deleteMany({
+      where: { employee: { id } },
+    });
+  
+    // 🔥 5. Delete employee
+    return await this.prisma.employee.delete({
+      where: { id },
+    });
+  }
+  
+  
 
   // ────────────────
   // 5️⃣ Find Employee by User ID
@@ -298,9 +388,38 @@ export class EmployeesService {
   // 7️⃣ Generate Employee Code
   // ────────────────
   private async generatePersonNo(): Promise<string> {
-    const count = await this.prisma.employee.count();
-    return `EMP${(10000 + count + 1).toString().slice(1)}`;
+    // 1️⃣ Get the highest existing employee number
+    const lastEmployee = await this.prisma.employee.findFirst({
+      orderBy: { personNo: 'desc' },  // EMP9999 > EMP0001 alphabetically
+      select: { personNo: true },
+    });
+  
+    let lastNum = 0;
+  
+    if (lastEmployee?.personNo) {
+      const digits = lastEmployee.personNo.replace("EMP", "");
+      lastNum = parseInt(digits, 10);
+    }
+  
+    // 2️⃣ Generate next valid ID
+    while (true) {
+      lastNum++;
+  
+      const num = lastNum.toString().padStart(4, "0");
+      const empNo = `EMP${num}`;
+  
+      // Condition 1: Must NOT contain digit "8"
+      if (num.includes("8")) continue;
+  
+      // Condition 2: Sum of digits must NOT equal 8
+      const sum = num.split("").reduce((acc, d) => acc + Number(d), 0);
+      if (sum === 8) continue;
+  
+      return empNo;
+    }
   }
+  
+  
 
   // ────────────────
   // 8️⃣ Basic List for Dropdowns

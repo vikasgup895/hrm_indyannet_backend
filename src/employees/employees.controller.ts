@@ -118,6 +118,7 @@ import {
   Get,
   Post,
   Body,
+  Delete, 
   Param,
   Put,
   Req,
@@ -230,9 +231,10 @@ export class EmployeesController {
   // ────────────────
   @Roles('ADMIN', 'HR')
   @Post()
-  async create(@Req() req: express.Request, @Body() dto: CreateEmployeeDto) {
-    return this.svc.create(dto);
+  async create(@Req() req: any, @Body() dto: CreateEmployeeDto) {
+    return this.svc.create(dto, req.user); 
   }
+  
 
   // ────────────────
   // 6️⃣ Update Employee by ID (admin/hr)
@@ -263,6 +265,14 @@ export class EmployeesController {
     const uploadedBy = req.user?.email ?? 'system';
     return this.svc.addDocument(id, file.path, uploadedBy);
   }
+
+
+
+  @Delete(':id')
+async deleteEmployee(@Param('id') id: string) {
+  return this.svc.deleteEmployee(id);
+}
+
 
   // ────────────────
   // 8️⃣ Basic List

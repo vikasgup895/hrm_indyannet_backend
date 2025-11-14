@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateBankDetailDto } from './bank-detail.dto';
+import { Role } from '@prisma/client';
 
 export enum EmployeeStatusDto {
   ACTIVE = 'Active',
@@ -75,6 +76,10 @@ export class CreateEmployeeDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @IsOptional()
+  @IsEnum(Role)
+  role?: Role;
 
   @IsOptional()
   @IsEnum(EmployeeStatusDto)
