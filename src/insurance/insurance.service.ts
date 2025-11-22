@@ -28,7 +28,21 @@ export class InsuranceService {
       // Only return the logged-in employee's insurance records
       return this.prisma.insurance.findMany({
         where: { employeeId },
-        include: {
+        select: {
+          id: true,
+          policyNumber: true,
+          provider: true,
+          startDate: true,
+          endDate: true,
+          coverageAmount: true,
+          bonusPercent: true,
+          ctcFileUrl: true,
+          eCashAmount: true,
+          convenienceFee: true,
+          updatedAt: true,
+  
+          employeeId: true,   // ✅ REQUIRED FOR CONVENIENCE CHARGES
+  
           employee: {
             select: {
               id: true,
@@ -42,10 +56,24 @@ export class InsuranceService {
         orderBy: { createdAt: 'desc' },
       });
     }
-
+  
     // Default: admin or HR gets everything
     return this.prisma.insurance.findMany({
-      include: {
+      select: {
+        id: true,
+        policyNumber: true,
+        provider: true,
+        startDate: true,
+        endDate: true,
+        coverageAmount: true,
+        bonusPercent: true,
+        ctcFileUrl: true,
+        eCashAmount: true,
+        convenienceFee: true,
+        updatedAt: true,
+  
+        employeeId: true, // ✅ also add here for consistency
+  
         employee: {
           select: {
             id: true,
@@ -59,6 +87,7 @@ export class InsuranceService {
       orderBy: { createdAt: 'desc' },
     });
   }
+  
 
   async findOne(id: string) {
     const insurance = await this.prisma.insurance.findUnique({

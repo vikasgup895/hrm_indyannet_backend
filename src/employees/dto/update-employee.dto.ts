@@ -54,6 +54,10 @@ export class UpdateEmployeeDto {
   educationQualification?: string;
 
   @IsOptional()
+  @IsString()
+  designation?: string;
+
+  @IsOptional()
   @IsEnum(GenderDto)
   gender?: GenderDto;
 

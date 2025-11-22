@@ -108,7 +108,8 @@ async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
         gender: dto.gender ?? null,
         address: dto.address ?? null,
         educationQualification: dto.educationQualification ?? null,
-  
+        designation: dto.designation ?? null,
+
         birthdate: dto.birthdate ? new Date(dto.birthdate) : null,
         hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
   
@@ -287,7 +288,8 @@ async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
       delete dto.lastName;
       delete dto.workEmail;
       delete dto.department;
-      delete dto.status; // Employees cannot change status
+      delete dto.status;  // Employees cannot change status
+      delete dto.designation;   // ⭐ Employee cannot update designation
     }
   
     //

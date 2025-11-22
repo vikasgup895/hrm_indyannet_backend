@@ -26,7 +26,6 @@ export enum GenderDto {
 
 export class CreateEmployeeDto {
   // --- Basic / Personal ---
-  // NOTE: personNo is intentionally NOT present here — backend will generate it
 
   @IsString()
   firstName: string;
@@ -77,6 +76,11 @@ export class CreateEmployeeDto {
   @IsString()
   location?: string;
 
+  // ⭐ NEW FIELD ADDED HERE
+  @IsOptional()
+  @IsString()
+  designation?: string;
+
   @IsOptional()
   @IsEnum(Role)
   role?: Role;
@@ -93,14 +97,10 @@ export class CreateEmployeeDto {
   @IsString()
   documentUrl?: string;
 
-  // --- Compensation ---
-  // If you want admins to be able to send salary at creation, add salary/currency here.
-  // For now we keep them out because your service may create Compensation separately.
-
-  // --- Optional: nested bank details array (if you support upserting bank details at creation) ---
+  // --- Bank Details ---
   @IsOptional()
-@IsArray()
-@ValidateNested({ each: true })
-@Type(() => CreateBankDetailDto)
-bankDetails?: CreateBankDetailDto[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateBankDetailDto)
+  bankDetails?: CreateBankDetailDto[];
 }

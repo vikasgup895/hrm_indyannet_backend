@@ -64,6 +64,8 @@ model Employee {
   department              String?
   location                String?
   status                  String             @default("Active")
+ 
+  designation             String?  
 
   managerId               String?
   manager                 Employee?          @relation("ManagerReports", fields: [managerId], references: [id])
@@ -71,6 +73,9 @@ model Employee {
 
   userId                  String?            @unique
   user                    User?              @relation(fields: [userId], references: [id])
+
+
+  convenienceCharges ConvenienceCharge[]
 
   compensation            Compensation?
   documents               Document[]
@@ -126,6 +131,19 @@ model Compensation {
   baseSalary  Float
   currency    String
   effectiveOn DateTime
+}
+
+model ConvenienceCharge {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  
+  title       String      // e.g., "ID Card Fee", "Processing Fee"
+  amount      Float
+  date        DateTime
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Document {
