@@ -364,27 +364,50 @@ async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
   // ────────────────
   // 6️⃣ Add Document
   // ────────────────
-  async addDocument(employeeId: string, filePath: string, uploadedBy?: string) {
+  async addDocument(
+    employeeId: string,
+    filePath: string,
+    uploadedBy?: string,
+  ) {
+    // 1️⃣ Confirm employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
     });
     if (!employee) throw new NotFoundException('Employee not found');
-
+  
+    // 2️⃣ Extract file info
     const fileName = filePath.split('/').pop() ?? filePath;
     const ext = fileName.split('.').pop() ?? '';
-
+  
+    // Normalize storage path (remove leading "./")
+    const normalizedPath = filePath.replace(/^\.?\//, '');
+  
+    // 3️⃣ Save document entry
     const document = await this.prisma.document.create({
       data: {
         employeeId,
         title: fileName,
         type: ext,
-        storageUrl: filePath,
+        storageUrl: normalizedPath,   // <-- stores clean path
         uploadedBy: uploadedBy ?? 'System',
       },
     });
-
-    return { message: 'Document uploaded and linked successfully', document };
+  
+    // 4️⃣ Return clean response
+    return {
+      success: true,
+      message: 'Document uploaded successfully',
+      document: {
+        id: document.id,
+        title: document.title,
+        type: document.type,
+        url: normalizedPath,
+        uploadedBy: document.uploadedBy,
+        createdAt: document.createdAt,
+      },
+    };
   }
+  
 
   // ────────────────
   // 7️⃣ Generate Employee Code
@@ -438,4 +461,37 @@ async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
       orderBy: { firstName: 'asc' },
     });
   }
+
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+  
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+  
+    const matches = await bcrypt.compare(oldPassword, user.passwordHash);
+  
+    if (!matches) {
+      throw new ForbiddenException('Old password is incorrect');
+    }
+  
+    const newHash = await bcrypt.hash(newPassword, 10);
+  
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
+  
+    return { message: 'Password updated successfully' };
+  }
+  
+
+   
+      
 }

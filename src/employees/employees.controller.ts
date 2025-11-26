@@ -118,7 +118,7 @@ import {
   Get,
   Post,
   Body,
-  Delete, 
+  Delete,
   Param,
   Put,
   Req,
@@ -126,6 +126,8 @@ import {
   UseInterceptors,
   NotFoundException,
   UseGuards,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { EmployeesService } from './employees.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
@@ -136,7 +138,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import express from 'express';
-import {PrismaService} from '../prisma.service';
+import { PrismaService } from '../prisma.service';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('employees')
@@ -145,7 +147,30 @@ export class EmployeesController {
     private readonly svc: EmployeesService,
     private readonly prisma: PrismaService,
 
-  ) {}
+  ) { }
+
+
+  // ────────────────
+  //  Change Password
+  // ────────────────
+  // Change Password 
+  @Put("change-password")
+  async changePassword(@Req() req, @Body() body: any) {
+    const userId = req.user?.id ?? req.user?.sub;
+  
+    if (!userId) {
+      throw new BadRequestException("User ID missing from token");
+    }
+  
+    return this.svc.changePassword(
+      userId,
+      body.oldPassword,
+      body.newPassword
+    );
+  }
+  
+
+
 
   // ────────────────
   // 1️⃣ Profile of Logged-in User
@@ -155,16 +180,16 @@ export class EmployeesController {
     const userId = req.user?.id ?? req.user?.sub;
     const userEmail = req.user?.email;
     const userRole = req.user?.role;
-   // console.log('subid', req.user?.sub);
-   // console.log('🟨 Logged-in User ID:', userId, '| Role:', userRole, '| Email:', userEmail);
-  
+    // console.log('subid', req.user?.sub);
+    // console.log('🟨 Logged-in User ID:', userId, '| Role:', userRole, '| Email:', userEmail);
+
     // 1️⃣ Try employee profile
     const employee = await this.svc.findByUserId(userId);
     if (employee) {
-     // console.log('🟩 Found employee record');
+      // console.log('🟩 Found employee record');
       return employee;
     }
-  
+
     // 2️⃣ Fallback for Admin/HR users using either ID or Email
     const user = await this.prisma.user.findFirst({
       where: {
@@ -172,12 +197,12 @@ export class EmployeesController {
       },
       select: { id: true, email: true, role: true },
     });
-  
-   // console.log('🟦 Found user record:', user);
-  
+
+    // console.log('🟦 Found user record:', user);
+
     // 3️⃣ Build default admin profile
     if (user && (user.role === 'ADMIN' || user.role === 'HR')) {
-     // console.log('🟢 Returning default admin profile');
+      // console.log('🟢 Returning default admin profile');
       return {
         id: user.id,
         firstName: 'Admin',
@@ -189,11 +214,11 @@ export class EmployeesController {
         user,
       };
     }
-  
-   // console.log('❌ Profile not found for user:', userId);
+
+    // console.log('❌ Profile not found for user:', userId);
     throw new NotFoundException('Profile not found');
   }
-  
+
 
 
   // ────────────────
@@ -209,6 +234,7 @@ export class EmployeesController {
 
     return this.svc.update(employee.id, dto, req.user);
   }
+
 
   // ────────────────
   // 3️⃣ List Employees
@@ -232,9 +258,9 @@ export class EmployeesController {
   @Roles('ADMIN', 'HR')
   @Post()
   async create(@Req() req: any, @Body() dto: CreateEmployeeDto) {
-    return this.svc.create(dto, req.user); 
+    return this.svc.create(dto, req.user);
   }
-  
+
 
   // ────────────────
   // 6️⃣ Update Employee by ID (admin/hr)
@@ -247,31 +273,53 @@ export class EmployeesController {
   // ────────────────
   // 7️⃣ Upload Employee Document
   // ────────────────
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'EMPLOYEE')
   @Post(':id/upload')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './uploads/employees',
         filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           const original = file.originalname.replace(/\s+/g, '-');
           cb(null, `${uniqueSuffix}-${original}`);
         },
       }),
     }),
   )
-  async upload(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Req() req: any) {
+  async uploadDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any
+  ) {
+    // 🛑 EMPLOYEE SECURITY CHECK (VERY IMPORTANT)
+    if (req.user.role === 'EMPLOYEE' && req.user.employeeId !== id) {
+      throw new ForbiddenException(
+        'Employees can only upload documents for themselves',
+      );
+    }
+
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
     const uploadedBy = req.user?.email ?? 'system';
-    return this.svc.addDocument(id, file.path, uploadedBy);
+    const result = await this.svc.addDocument(id, file.path, uploadedBy);
+
+    return {
+      message: 'Document uploaded successfully',
+      document: result,
+    };
   }
 
 
 
+
   @Delete(':id')
-async deleteEmployee(@Param('id') id: string) {
-  return this.svc.deleteEmployee(id);
-}
+  async deleteEmployee(@Param('id') id: string) {
+    return this.svc.deleteEmployee(id);
+  }
 
 
   // ────────────────
@@ -281,4 +329,8 @@ async deleteEmployee(@Param('id') id: string) {
   async getAllBasic() {
     return this.svc.getAllBasic();
   }
+
+  
+  
+
 }
