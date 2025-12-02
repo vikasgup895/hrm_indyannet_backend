@@ -68,19 +68,31 @@ export class DashboardService {
     });
 
     return employees
-      .filter(emp => {
+      .filter((emp) => {
         if (!emp.birthdate) return false;
         const dob = new Date(emp.birthdate);
-        const nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-        const diff = (nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+        const nextBirthday = new Date(
+          today.getFullYear(),
+          dob.getMonth(),
+          dob.getDate(),
+        );
+        const diff =
+          (nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
 
         return diff >= 0 && diff <= 30;
       })
-      .map(emp => ({
+      .map((emp) => ({
         id: emp.id,
         name: `${emp.firstName} ${emp.lastName}`,
-        date: new Date(today.getFullYear(), new Date(emp.birthdate!).getMonth(), new Date(emp.birthdate!).getDate())
-          .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+        date: new Date(
+          today.getFullYear(),
+          new Date(emp.birthdate!).getMonth(),
+          new Date(emp.birthdate!).getDate(),
+        ).toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+        }),
         avatar: `${emp.firstName[0]}${emp.lastName[0]}`,
       }))
       .slice(0, 5);
@@ -92,16 +104,26 @@ export class DashboardService {
 
     const employees = await this.prisma.employee.findMany({
       where: { status: 'Active', hireDate: { gte: thirtyDaysAgo } },
-      select: { id: true, firstName: true, lastName: true, department: true, hireDate: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        department: true,
+        hireDate: true,
+      },
       orderBy: { hireDate: 'desc' },
       take: 5,
     });
 
-    return employees.map(emp => ({
+    return employees.map((emp) => ({
       id: emp.id,
       name: `${emp.firstName} ${emp.lastName}`,
       role: emp.department || 'Employee',
-      date: emp.hireDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+      date: emp.hireDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      }),
       avatar: `${emp.firstName[0]}${emp.lastName[0]}`,
     }));
   }
@@ -113,16 +135,26 @@ export class DashboardService {
 
     const employees = await this.prisma.employee.findMany({
       where: { terminationDate: { gte: today, lte: nextMonth } },
-      select: { id: true, firstName: true, lastName: true, department: true, terminationDate: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        department: true,
+        terminationDate: true,
+      },
       orderBy: { terminationDate: 'asc' },
       take: 5,
     });
 
-    return employees.map(emp => ({
+    return employees.map((emp) => ({
       id: emp.id,
       name: `${emp.firstName} ${emp.lastName}`,
       department: emp.department || 'Unknown',
-      date: emp.terminationDate!.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+      date: emp.terminationDate!.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      }),
       avatar: `${emp.firstName[0]}${emp.lastName[0]}`,
     }));
   }
@@ -136,23 +168,38 @@ export class DashboardService {
     });
 
     return employees
-      .filter(emp => {
+      .filter((emp) => {
         const hire = new Date(emp.hireDate);
-        const anniv = new Date(today.getFullYear(), hire.getMonth(), hire.getDate());
-        const diff = (anniv.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+        const anniv = new Date(
+          today.getFullYear(),
+          hire.getMonth(),
+          hire.getDate(),
+        );
+        const diff =
+          (anniv.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
 
-        return diff >= 0 && diff <= 30 && today.getFullYear() > hire.getFullYear();
+        return (
+          diff >= 0 && diff <= 30 && today.getFullYear() > hire.getFullYear()
+        );
       })
-      .map(emp => {
+      .map((emp) => {
         const hire = new Date(emp.hireDate);
         const years = today.getFullYear() - hire.getFullYear();
-        const anniv = new Date(today.getFullYear(), hire.getMonth(), hire.getDate());
+        const anniv = new Date(
+          today.getFullYear(),
+          hire.getMonth(),
+          hire.getDate(),
+        );
 
         return {
           id: emp.id,
           name: `${emp.firstName} ${emp.lastName}`,
           years,
-          date: anniv.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          date: anniv.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          }),
         };
       })
       .slice(0, 5);
@@ -170,10 +217,14 @@ export class DashboardService {
       take: 5,
     });
 
-    return holidays.map(h => ({
+    return holidays.map((h) => ({
       id: h.id,
       name: h.name,
-      date: h.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      date: h.date.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      }),
       description: h.description,
     }));
   }
@@ -190,7 +241,9 @@ export class DashboardService {
 
     return {
       approved: totalUsed ? Math.round((totalUsed / totalAllotted) * 100) : 0,
-      available: totalAllotted ? Math.round(((totalAllotted - totalUsed) / totalAllotted) * 100) : 100,
+      available: totalAllotted
+        ? Math.round(((totalAllotted - totalUsed) / totalAllotted) * 100)
+        : 100,
       pending: 5,
       expired: 0,
     };
@@ -213,7 +266,7 @@ export class DashboardService {
       take: 10,
     });
 
-    return departments.map(d => ({
+    return departments.map((d) => ({
       department: d.department || 'Unknown',
       count: d._count.id,
     }));
@@ -225,7 +278,14 @@ export class DashboardService {
   async getEmployeeDashboardData(userId: string) {
     const employee = await this.prisma.employee.findFirst({
       where: { userId },
-      select: { id: true, firstName: true, lastName: true, department: true, hireDate: true, status: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        department: true,
+        hireDate: true,
+        status: true,
+      },
     });
 
     if (!employee) return { message: 'Employee not found' };
@@ -271,6 +331,7 @@ export class DashboardService {
     const members = await this.prisma.employee.findMany({
       where: {
         department,
+        status: 'Active',
         NOT: { id: employeeId },
       },
       select: {
@@ -281,7 +342,7 @@ export class DashboardService {
       },
     });
 
-    return members.map(m => ({
+    return members.map((m) => ({
       id: m.id,
       name: `${m.firstName} ${m.lastName}`,
       role: m.designation || 'Employee',
@@ -292,7 +353,9 @@ export class DashboardService {
   /* LEAVE SUMMARY FOR EMPLOYEE */
   private async getEmployeeLeaveBalance(employeeId: string) {
     const period = new Date().toISOString().slice(0, 7);
-    const balances = await this.prisma.leaveBalance.findMany({ where: { employeeId, period } });
+    const balances = await this.prisma.leaveBalance.findMany({
+      where: { employeeId, period },
+    });
 
     const allotted = balances.reduce((s, b) => s + (b.allotted ?? 0), 0);
     const used = balances.reduce((s, b) => s + (b.used ?? 0), 0);

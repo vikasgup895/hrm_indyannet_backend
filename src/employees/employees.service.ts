@@ -457,6 +457,7 @@ async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
         lastName: true,
         department: true,
         workEmail: true,
+        status:true,
       },
       orderBy: { firstName: 'asc' },
     });

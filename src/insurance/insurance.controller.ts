@@ -7,13 +7,19 @@ import {
   Get,
   Post,
   Body,
+  Query,
   Param,
   Delete,
   Put,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Req,
   ForbiddenException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import type { Request } from 'express';
 import { InsuranceService } from './insurance.service';
 import { CreateInsuranceDto } from './dto/create-insurance.dto';
@@ -48,7 +54,39 @@ export class InsuranceController {
   }
 
   /**
-   * 👤 Get logged-in employee’s insurance record
+   * � List insurance documents (ADMIN/HR/EMPLOYEE)
+   * - Filter by employeeId or insuranceId (policy number)
+   * - Employees only see their own documents
+   * NOTE: Placed BEFORE dynamic :id route to prevent it being captured as an id.
+   */
+  @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  @Get('docs')
+  async listDocuments(
+    @Query('employeeId') employeeId: string,
+    @Query('insuranceId') insuranceId: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as any;
+    return this.insuranceService.listDocuments({
+      employeeId,
+      insuranceId,
+      requesterRole: user.role,
+      requesterEmployeeId: user.employeeId,
+    });
+  }
+
+  /**
+   * � Delete an insurance document (ADMIN/HR only)
+   * NOTE: Placed before dynamic :id route.
+   */
+  @Roles('ADMIN', 'HR')
+  @Delete('docs/:id')
+  async deleteDocument(@Param('id') id: string) {
+    return this.insuranceService.deleteDocument(id);
+  }
+
+  /**
+   * ��👤 Get logged-in employee’s insurance record
    */
   @Roles('EMPLOYEE')
   @Get('my')
@@ -117,5 +155,38 @@ export class InsuranceController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.insuranceService.remove(id);
+  }
+
+  /**
+   * 📎 Upload insurance-related document (ADMIN/HR)
+   * Stores file under uploads/insurance and records in Document table
+   */
+  @Roles('ADMIN', 'HR')
+  @Post('docs')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: 'uploads/insurance',
+        filename: (_req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, unique + extname(file.originalname));
+        },
+      }),
+    }),
+  )
+  async uploadDocument(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('employeeId') employeeId: string,
+    @Body('insuranceId') insuranceId: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as any;
+    return this.insuranceService.uploadDocument({
+      employeeId,
+      insuranceId,
+      storageUrl: file ? `/uploads/insurance/${file.filename}` : undefined,
+      originalName: file?.originalname,
+      uploadedBy: user?.id,
+    });
   }
 }
