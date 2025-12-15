@@ -88,13 +88,14 @@ async function bootstrap() {
   const port = process.env.PORT || 4000;
   await app.listen(port);
 
-  if (!isProd) {
+
     console.log(`🚀 API running at: http://localhost:${port}`);
     console.log(
       `📂 Uploaded files available at: http://localhost:${port}/uploads/`,
     );
     console.log(`📄 Physical upload directory: ${employeeDir}`);
-  }
+    console.log("🔥 HRM BACKEND RESTARTED AT", new Date().toISOString());
+
 }
 
 bootstrap();
