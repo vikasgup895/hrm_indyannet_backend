@@ -183,25 +183,8 @@ export class ConvenienceChargeController {
   }
 
   /**
-   * 🔍 Get a specific convenience charge by ID
-   */
-  @Roles('ADMIN', 'HR')
-  @Get('charge/:id')
-  findOne(@Param('id') id: string) {
-    return this.convenienceChargeService.findOne(id);
-  }
 
-  /**
-   * 🧩 Update a convenience charge (ADMIN/HR only)
-   */
-  @Roles('ADMIN', 'HR')
-  @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateConvenienceChargeDto) {
-    return this.convenienceChargeService.update(id, dto);
-  }
-
-  /**
-   * 🔄 Bulk approve/reject charges
+   * � Bulk approve/reject charges (MUST be before @Put(':id'))
    * Format: { chargeId1: 'APPROVED', chargeId2: 'REJECTED', ... }
    * With optional rejectionReasons: { chargeId2: 'Insufficient proof', ... }
    */
@@ -224,7 +207,7 @@ export class ConvenienceChargeController {
   }
 
   /**
-   * 🧩 Employee bulk creates multiple charges at once
+   * 🧩 Employee bulk creates multiple charges at once (MUST be before @Post())
    * Format: { charges: [{title, amount, date}, {title, amount, date}] }
    */
   @Roles('EMPLOYEE')
@@ -242,32 +225,47 @@ export class ConvenienceChargeController {
   }
 
   /**
-   * [LEGACY] 📋 Get convenience charges for an employee
+   * 🔍 Get a specific convenience charge by ID
    */
-  // @Roles('ADMIN', 'HR', 'EMPLOYEE')
-  // @Get(':employeeId')
-  // async findByEmployeeIdLegacy(
-  //   @Param('employeeId') employeeId: string,
-  //   @Req() req: Request,
-  // ) {
-  //   const user = req.user as any;
+  @Roles('ADMIN', 'HR')
+  @Get('charge/:id')
+  findOne(@Param('id') id: string) {
+    return this.convenienceChargeService.findOne(id);
+  }
 
-  //   // If user is EMPLOYEE, they can only access their own data
-  //   if (user.role === 'EMPLOYEE') {
-  //     if (!user.employeeId) {
-  //       throw new ForbiddenException('Employee ID not found in your session');
-  //     }
-  //     if (user.employeeId !== employeeId) {
-  //       throw new ForbiddenException(
-  //         'You can only access your own convenience charges',
-  //       );
-  //     }
-  //   }
+  /**
+   * 🧩 Update a convenience charge (ADMIN/HR only)
+   */
+  @Roles('ADMIN', 'HR')
+  @Put(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateConvenienceChargeDto) {
+    return this.convenienceChargeService.update(id, dto);
+  }
 
-  //   return this.convenienceChargeService.findByEmployeeId(
-  //     employeeId,
-  //     user.role,
-  //     user.employeeId,
-  //   );
-  // }
+  @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  @Get(':employeeId')
+  async findByEmployeeIdLegacy(
+    @Param('employeeId') employeeId: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as any;
+
+    // If user is EMPLOYEE, they can only access their own data
+    if (user.role === 'EMPLOYEE') {
+      if (!user.employeeId) {
+        throw new ForbiddenException('Employee ID not found in your session');
+      }
+      if (user.employeeId !== employeeId) {
+        throw new ForbiddenException(
+          'You can only access your own convenience charges',
+        );
+      }
+    }
+
+    return this.convenienceChargeService.findByEmployeeId(
+      employeeId,
+      user.role,
+      user.employeeId,
+    );
+  }
 }
