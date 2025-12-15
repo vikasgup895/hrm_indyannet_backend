@@ -18,65 +18,12 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import type { Request } from 'express';
 
-/**
- * Normalized user object from JWT payload
- * Ensures consistent access to user identity across all endpoints
- */
-interface NormalizedUser {
-  sub: string; // User ID from JWT
-  employeeId: string; // Employee record ID (linked via employee.userId)
-  role: 'EMPLOYEE' | 'HR' | 'ADMIN';
-  email?: string;
-}
-
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('convenience')
 export class ConvenienceChargeController {
   constructor(
     private readonly convenienceChargeService: ConvenienceChargeService,
   ) {}
-
-  /**
-   * Extract and normalize user from request
-   * Ensures req.user always has consistent structure
-   */
-  private normalizeUser(req: Request): NormalizedUser {
-    const user = req.user as Record<string, unknown> | undefined;
-    if (!user || !user.sub) {
-      throw new ForbiddenException('User not authenticated');
-    }
-    if (!user.employeeId) {
-      throw new ForbiddenException('Employee ID not found in session');
-    }
-    return {
-      sub: user.sub as string,
-      employeeId: user.employeeId as string,
-      role: (user.role as 'EMPLOYEE' | 'HR' | 'ADMIN') || 'EMPLOYEE',
-      email: user.email as string | undefined,
-    };
-  }
-
-  /**
-   * 📋 Get ALL PENDING charges (HR/Admin review list)
-   * ✅ MUST be before @Get(':id') to prevent route collision
-   */
-  @Roles('ADMIN', 'HR')
-  @Get('pending/all')
-  async getPendingCharges() {
-    return this.convenienceChargeService.getPendingCharges();
-  }
-
-  /**
-   * 📋 Get charges by status (PENDING, APPROVED, REJECTED)
-   * ✅ MUST be before @Get(':id') to prevent route collision
-   */
-  @Roles('ADMIN', 'HR')
-  @Get('status/:status')
-  async getChargesByStatus(
-    @Param('status') status: 'PENDING' | 'APPROVED' | 'REJECTED',
-  ) {
-    return this.convenienceChargeService.getChargesByStatus(status);
-  }
 
   /**
    * 🧾 Employee submits a convenience charge (creates in PENDING status)
@@ -87,7 +34,7 @@ export class ConvenienceChargeController {
     @Body() dto: CreateConvenienceChargeDto,
     @Req() req: Request,
   ) {
-    const user = this.normalizeUser(req);
+    const user = req.user as any;
     return this.convenienceChargeService.createByEmployee(user.employeeId, dto);
   }
 
@@ -102,12 +49,32 @@ export class ConvenienceChargeController {
     @Param('employeeId') employeeId: string,
     @Req() req: Request,
   ) {
-    const user = this.normalizeUser(req);
+    const user = req.user as any;
     return this.convenienceChargeService.findByEmployeeId(
       employeeId,
       user.role,
       user.employeeId,
     );
+  }
+
+  /**
+   * 📋 Get ALL PENDING charges (HR/Admin review list)
+   */
+  @Roles('ADMIN', 'HR')
+  @Get('pending/all')
+  async getPendingCharges() {
+    return this.convenienceChargeService.getPendingCharges();
+  }
+
+  /**
+   * 📋 Get charges by status (PENDING, APPROVED, REJECTED)
+   */
+  @Roles('ADMIN', 'HR')
+  @Get('status/:status')
+  async getChargesByStatus(
+    @Param('status') status: 'PENDING' | 'APPROVED' | 'REJECTED',
+  ) {
+    return this.convenienceChargeService.getChargesByStatus(status);
   }
 
   /**
@@ -120,7 +87,7 @@ export class ConvenienceChargeController {
     @Body() dto: UpdateConvenienceChargeDto,
     @Req() req: Request,
   ) {
-    const user = this.normalizeUser(req);
+    const user = req.user as any;
     return this.convenienceChargeService.updateByEmployee(
       chargeId,
       user.employeeId,
@@ -138,10 +105,10 @@ export class ConvenienceChargeController {
     @Body() body: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string },
     @Req() req: Request,
   ) {
-    const user = this.normalizeUser(req);
+    const user = req.user as any;
     return this.convenienceChargeService.approveCharge(
       chargeId,
-      user.sub,
+      user.id,
       body.status,
       body.rejectionReason,
     );
@@ -156,7 +123,7 @@ export class ConvenienceChargeController {
     @Param('chargeId') chargeId: string,
     @Req() req: Request,
   ) {
-    const user = this.normalizeUser(req);
+    const user = req.user as any;
     return this.convenienceChargeService.removeByEmployee(
       chargeId,
       user.employeeId,
@@ -181,47 +148,7 @@ export class ConvenienceChargeController {
     return this.convenienceChargeService.create(dto);
   }
 
-  /**
-
-   * � Bulk approve/reject charges (MUST be before @Put(':id'))
-   * Format: { chargeId1: 'APPROVED', chargeId2: 'REJECTED', ... }
-   * With optional rejectionReasons: { chargeId2: 'Insufficient proof', ... }
-   */
-  @Roles('ADMIN', 'HR')
-  @Put('bulk/approve-reject')
-  async bulkApproveCharges(
-    @Body()
-    body: {
-      charges: Record<string, 'APPROVED' | 'REJECTED'>;
-      rejectionReasons?: Record<string, string>;
-    },
-    @Req() req: Request,
-  ) {
-    const user = this.normalizeUser(req);
-    return this.convenienceChargeService.bulkApproveCharges(
-      user.sub,
-      body.charges,
-      body.rejectionReasons,
-    );
-  }
-
-  /**
-   * 🧩 Employee bulk creates multiple charges at once (MUST be before @Post())
-   * Format: { charges: [{title, amount, date}, {title, amount, date}] }
-   */
-  @Roles('EMPLOYEE')
-  @Post('bulk-create')
-  async bulkCreateCharges(
-    @Body()
-    body: { charges: Array<{ title: string; amount: number; date: string }> },
-    @Req() req: Request,
-  ) {
-    const user = this.normalizeUser(req);
-    return this.convenienceChargeService.bulkCreateByEmployee(
-      user.employeeId,
-      body.charges,
-    );
-  }
+  
 
   /**
    * 🔍 Get a specific convenience charge by ID
@@ -241,33 +168,74 @@ export class ConvenienceChargeController {
     return this.convenienceChargeService.update(id, dto);
   }
 
-  @Roles('ADMIN', 'HR', 'EMPLOYEE')
-  @Get(':employeeId')
-  async findByEmployeeIdLegacy(
-    @Param('employeeId') employeeId: string,
+  /**
+   * 🔄 Bulk approve/reject charges
+   * Format: { chargeId1: 'APPROVED', chargeId2: 'REJECTED', ... }
+   * With optional rejectionReasons: { chargeId2: 'Insufficient proof', ... }
+   */
+  @Roles('ADMIN', 'HR')
+  @Put('bulk/approve-reject')
+  async bulkApproveCharges(
+    @Body()
+    body: {
+      charges: Record<string, 'APPROVED' | 'REJECTED'>;
+      rejectionReasons?: Record<string, string>;
+    },
     @Req() req: Request,
   ) {
-    const user = req.user as Record<string, unknown> | undefined;
-    if (!user) {
-      throw new ForbiddenException('User not authenticated');
-    }
-
-    // If user is EMPLOYEE, they can only access their own data
-    if (user.role === 'EMPLOYEE') {
-      if (!user.employeeId) {
-        throw new ForbiddenException('Employee ID not found in your session');
-      }
-      if (user.employeeId !== employeeId) {
-        throw new ForbiddenException(
-          'You can only access your own convenience charges',
-        );
-      }
-    }
-
-    return this.convenienceChargeService.findByEmployeeId(
-      employeeId,
-      user.role as 'EMPLOYEE' | 'HR' | 'ADMIN',
-      user.employeeId as string,
+    const user = req.user as any;
+    return this.convenienceChargeService.bulkApproveCharges(
+      user.id,
+      body.charges,
+      body.rejectionReasons,
     );
   }
+
+  /**
+   * 🧩 Employee bulk creates multiple charges at once
+   * Format: { charges: [{title, amount, date}, {title, amount, date}] }
+   */
+  @Roles('EMPLOYEE')
+  @Post('bulk-create')
+  async bulkCreateCharges(
+    @Body()
+    body: { charges: Array<{ title: string; amount: number; date: string }> },
+    @Req() req: Request,
+  ) {
+    const user = req.user as any;
+    return this.convenienceChargeService.bulkCreateByEmployee(
+      user.employeeId,
+      body.charges,
+    );
+  }
+
+  /**
+   * [LEGACY] 📋 Get convenience charges for an employee
+   */
+  // @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  // @Get(':employeeId')
+  // async findByEmployeeIdLegacy(
+  //   @Param('employeeId') employeeId: string,
+  //   @Req() req: Request,
+  // ) {
+  //   const user = req.user as any;
+
+  //   // If user is EMPLOYEE, they can only access their own data
+  //   if (user.role === 'EMPLOYEE') {
+  //     if (!user.employeeId) {
+  //       throw new ForbiddenException('Employee ID not found in your session');
+  //     }
+  //     if (user.employeeId !== employeeId) {
+  //       throw new ForbiddenException(
+  //         'You can only access your own convenience charges',
+  //       );
+  //     }
+  //   }
+
+  //   return this.convenienceChargeService.findByEmployeeId(
+  //     employeeId,
+  //     user.role,
+  //     user.employeeId,
+  //   );
+  // }
 }

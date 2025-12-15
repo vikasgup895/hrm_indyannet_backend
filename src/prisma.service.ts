@@ -6,6 +6,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   // insurance: any;
   async onModuleInit() {
     await this.$connect();
+    console.log('Prisma connected');
   }
 
   enableShutdownHooks(app: INestApplication): void {

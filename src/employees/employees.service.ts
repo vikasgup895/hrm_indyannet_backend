@@ -20,8 +20,8 @@ import { MailerService } from '../mailer/mailer.service'; // << ADD THIS
 export class EmployeesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly mailer: MailerService,
-  ) {}
+     private readonly mailer: MailerService
+    ) { }
 
   // ────────────────
   // 1️⃣ List All Employees
@@ -60,37 +60,39 @@ export class EmployeesService {
   // ────────────────
   // 3️⃣ Create Employee
   // ────────────────
-  async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.workEmail },
-    });
+async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
 
-    if (existingUser) {
-      throw new BadRequestException('A user with this email already exists');
-    }
-    const personNo = await this.generatePersonNo();
+  const existingUser = await this.prisma.user.findUnique({
+    where: { email: dto.workEmail },
+  });
+  
+  if (existingUser) {
+    throw new BadRequestException('A user with this email already exists');
+  }
+  const personNo = await this.generatePersonNo();
 
-    // 1. Create User Login
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.workEmail,
-        passwordHash: await this.hashPassword(
-          process.env.DEFAULT_EMPLOYEE_PASSWORD || 'password123',
-        ),
-        role: dto.role || Role.EMPLOYEE, // ✔️ Use selected role (enum)
-      },
-    });
+  // 1. Create User Login
+  const user = await this.prisma.user.create({
+    data: {
+      email: dto.workEmail,
+      passwordHash: await this.hashPassword(
+        process.env.DEFAULT_EMPLOYEE_PASSWORD || 'password123',
+      ),
+      role: dto.role || Role.EMPLOYEE,   // ✔️ Use selected role (enum)
+    },
+  });
+  
+  // Only ADMIN can create HR
+  if (dto.role === Role.HR && currentUser?.role !== Role.ADMIN) {
+    throw new ForbiddenException('Only admin can create HR accounts');
+  }
+  
+  // Only ADMIN can create ADMIN
+  if (dto.role === Role.ADMIN && currentUser?.role !== Role.ADMIN) {
+    throw new ForbiddenException('Only admin can create admin accounts');
+  }
 
-    // Only ADMIN can create HR
-    if (dto.role === Role.HR && currentUser?.role !== Role.ADMIN) {
-      throw new ForbiddenException('Only admin can create HR accounts');
-    }
-
-    // Only ADMIN can create ADMIN
-    if (dto.role === Role.ADMIN && currentUser?.role !== Role.ADMIN) {
-      throw new ForbiddenException('Only admin can create admin accounts');
-    }
-
+  
     // 2. Create Employee Record (saving ALL fields)
     const employee = await this.prisma.employee.create({
       data: {
@@ -98,7 +100,7 @@ export class EmployeesService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         workEmail: dto.workEmail,
-
+  
         // 🔥 THESE FIELDS WERE NOT SAVED BEFORE — FIXED NOW
         personalEmail: dto.personalEmail ?? null,
         phone: dto.phone ?? null,
@@ -110,16 +112,16 @@ export class EmployeesService {
 
         birthdate: dto.birthdate ? new Date(dto.birthdate) : null,
         hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
-
+  
         department: dto.department ?? null,
         location: dto.location ?? null,
         status: dto.status ?? 'Active',
-
+  
         managerId: dto.managerId ?? null,
         userId: user.id,
       },
     });
-
+  
     // 3. Send Email After Creation
     await this.mailer.send(
       dto.workEmail,
@@ -164,16 +166,19 @@ export class EmployeesService {
           <p style="margin-top: 6px; color: #999;">This is an automated email. Please do not reply.</p>
         </div>
       </div>
-      `,
+      `
     );
-
+  
     return employee;
   }
+  
+  
 
   private async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt(10);
     return bcrypt.hash(password, salt);
   }
+
 
   // 4️⃣ Update Employee or Self (Fixed Bank Detail Handling)
   // ────────────────
@@ -182,35 +187,24 @@ export class EmployeesService {
     dto: UpdateEmployeeDto,
     currentUser?: any,
   ): Promise<Employee> {
+  
     const employee = await this.prisma.employee.findUnique({
       where: { id },
       include: { bankDetail: true },
     });
-
+  
     if (!employee) throw new NotFoundException('Employee not found');
-
+  
     const role = currentUser?.role ?? null;
     const isAdminOrHR =
       role === Role.ADMIN || role === 'ADMIN' || role === 'HR';
     const isOwner =
       currentUser?.employeeId === id || currentUser?.id === employee.userId;
-
+  
     if (!isAdminOrHR && !isOwner) {
       throw new ForbiddenException('Not authorized to update this profile');
     }
-
-    //
-    // ───────────────────────────────────────────────
-    // NORMALIZE DATE FIELDS (Convert to ISO-8601 DateTime)
-    // ───────────────────────────────────────────────
-    //
-    if (dto.birthdate && typeof dto.birthdate === 'string') {
-      // If it's a date string like "2000-01-15", convert to ISO DateTime
-      if (!dto.birthdate.includes('T')) {
-        dto.birthdate = new Date(dto.birthdate).toISOString();
-      }
-    }
-
+  
     //
     // ───────────────────────────────────────────────
     // NORMALIZE BANK DETAIL FIELDS
@@ -227,9 +221,9 @@ export class EmployeesService {
         'uan',
         'uanNumber',
       ];
-
+  
       const hasBankFields = bankKeys.some((k) => (dto as any)[k] !== undefined);
-
+  
       if (hasBankFields) {
         dto.bankDetail = {
           bankName: (dto as any).bankName,
@@ -245,7 +239,7 @@ export class EmployeesService {
         };
       }
     }
-
+  
     //
     // ───────────────────────────────────────────────
     // HANDLE BANKDETAIL UPSERT
@@ -253,14 +247,14 @@ export class EmployeesService {
     //
     if (dto.bankDetail) {
       const bd = dto.bankDetail;
-
+  
       await this.prisma.bankDetail.upsert({
         where: { employeeId: id },
         create: {
           employee: { connect: { id } },
-          bankName: bd.bankName ?? '',
-          accountNumber: bd.accountNumber ?? '',
-          ifscCode: bd.ifscCode ?? '',
+          bankName: bd.bankName ?? "",
+          accountNumber: bd.accountNumber ?? "",
+          ifscCode: bd.ifscCode ?? "",
           branch: bd.branch ?? null,
           pfNumber: bd.pfNumber ?? null,
           uan: bd.uan ?? null,
@@ -280,10 +274,10 @@ export class EmployeesService {
             `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim(),
         },
       });
-
+  
       delete (dto as any).bankDetail;
     }
-
+  
     //
     // ───────────────────────────────────────────────
     // PREVENT EMPLOYEE (NON-HR) FROM UPDATING LOCKED FIELDS
@@ -294,10 +288,10 @@ export class EmployeesService {
       delete dto.lastName;
       delete dto.workEmail;
       delete dto.department;
-      delete dto.status; // Employees cannot change status
-      delete dto.designation; // ⭐ Employee cannot update designation
+      delete dto.status;  // Employees cannot change status
+      delete dto.designation;   // ⭐ Employee cannot update designation
     }
-
+  
     //
     // ───────────────────────────────────────────────
     // UPDATE EMPLOYEE
@@ -312,21 +306,22 @@ export class EmployeesService {
         user: { select: { id: true, email: true, role: true } },
       },
     });
-
+  
     return updatedEmployee;
   }
-
+  
   async deleteEmployee(id: string) {
+
     // 🔥 1. Remove manager assignments (clear managerId on subordinates)
     await this.prisma.employee.updateMany({
       where: { managerId: id },
       data: { managerId: null },
     });
-
+  
     // 🔥 2. Delete 1:1 relations
     await this.prisma.bankDetail.deleteMany({ where: { employeeId: id } });
     await this.prisma.compensation.deleteMany({ where: { employeeId: id } });
-
+  
     // 🔥 3. Delete 1:N relations
     await this.prisma.document.deleteMany({ where: { employeeId: id } });
     await this.prisma.insurance.deleteMany({ where: { employeeId: id } });
@@ -336,17 +331,19 @@ export class EmployeesService {
       where: { employeeId: id },
     });
     await this.prisma.payslip.deleteMany({ where: { employeeId: id } });
-
+  
     // 🔥 4. Delete User record if exists
     await this.prisma.user.deleteMany({
       where: { employee: { id } },
     });
-
+  
     // 🔥 5. Delete employee
     return await this.prisma.employee.delete({
       where: { id },
     });
   }
+  
+  
 
   // ────────────────
   // 5️⃣ Find Employee by User ID
@@ -367,31 +364,35 @@ export class EmployeesService {
   // ────────────────
   // 6️⃣ Add Document
   // ────────────────
-  async addDocument(employeeId: string, filePath: string, uploadedBy?: string) {
+  async addDocument(
+    employeeId: string,
+    filePath: string,
+    uploadedBy?: string,
+  ) {
     // 1️⃣ Confirm employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
     });
     if (!employee) throw new NotFoundException('Employee not found');
-
+  
     // 2️⃣ Extract file info
     const fileName = filePath.split('/').pop() ?? filePath;
     const ext = fileName.split('.').pop() ?? '';
-
+  
     // Normalize storage path (remove leading "./")
     const normalizedPath = filePath.replace(/^\.?\//, '');
-
+  
     // 3️⃣ Save document entry
     const document = await this.prisma.document.create({
       data: {
         employeeId,
         title: fileName,
         type: ext,
-        storageUrl: normalizedPath, // <-- stores clean path
+        storageUrl: normalizedPath,   // <-- stores clean path
         uploadedBy: uploadedBy ?? 'System',
       },
     });
-
+  
     // 4️⃣ Return clean response
     return {
       success: true,
@@ -406,6 +407,7 @@ export class EmployeesService {
       },
     };
   }
+  
 
   // ────────────────
   // 7️⃣ Generate Employee Code
@@ -413,34 +415,36 @@ export class EmployeesService {
   private async generatePersonNo(): Promise<string> {
     // 1️⃣ Get the highest existing employee number
     const lastEmployee = await this.prisma.employee.findFirst({
-      orderBy: { personNo: 'desc' }, // EMP9999 > EMP0001 alphabetically
+      orderBy: { personNo: 'desc' },  // EMP9999 > EMP0001 alphabetically
       select: { personNo: true },
     });
-
+  
     let lastNum = 0;
-
+  
     if (lastEmployee?.personNo) {
-      const digits = lastEmployee.personNo.replace('EMP', '');
+      const digits = lastEmployee.personNo.replace("EMP", "");
       lastNum = parseInt(digits, 10);
     }
-
+  
     // 2️⃣ Generate next valid ID
     while (true) {
       lastNum++;
-
-      const num = lastNum.toString().padStart(4, '0');
+  
+      const num = lastNum.toString().padStart(4, "0");
       const empNo = `EMP${num}`;
-
+  
       // Condition 1: Must NOT contain digit "8"
-      if (num.includes('8')) continue;
-
+      if (num.includes("8")) continue;
+  
       // Condition 2: Sum of digits must NOT equal 8
-      const sum = num.split('').reduce((acc, d) => acc + Number(d), 0);
+      const sum = num.split("").reduce((acc, d) => acc + Number(d), 0);
       if (sum === 8) continue;
-
+  
       return empNo;
     }
   }
+  
+  
 
   // ────────────────
   // 8️⃣ Basic List for Dropdowns
@@ -453,7 +457,7 @@ export class EmployeesService {
         lastName: true,
         department: true,
         workEmail: true,
-        status: true,
+        status:true,
       },
       orderBy: { firstName: 'asc' },
     });
@@ -467,24 +471,28 @@ export class EmployeesService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
-
+  
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
+  
     const matches = await bcrypt.compare(oldPassword, user.passwordHash);
-
+  
     if (!matches) {
       throw new ForbiddenException('Old password is incorrect');
     }
-
+  
     const newHash = await bcrypt.hash(newPassword, 10);
-
+  
     await this.prisma.user.update({
       where: { id: userId },
       data: { passwordHash: newHash },
     });
-
+  
     return { message: 'Password updated successfully' };
   }
+  
+
+   
+      
 }

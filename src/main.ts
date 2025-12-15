@@ -4,29 +4,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as fs from 'fs';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-
-// 🔇 Silence console output in production (keep warnings and errors)
-const isProd = process.env.NODE_ENV === 'production';
-if (isProd) {
-  const noop = () => {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (console as any).debug = noop;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (console as any).info = noop;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (console as any).log = noop;
-  // keep warn and error for visibility in prod
-}
 
 async function bootstrap() {
   // ✅ Use NestExpressApplication for static file serving
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    // Configure Nest logger levels based on environment
-    logger: isProd
-      ? ['error', 'warn']
-      : ['log', 'error', 'warn', 'debug', 'verbose'],
-  });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   /* -----------------------------------------------------
      ✅ Ensure upload directories exist (avoid Multer errors)
@@ -36,13 +17,12 @@ async function bootstrap() {
 
   if (!fs.existsSync(uploadRoot)) {
     fs.mkdirSync(uploadRoot, { recursive: true });
-    if (!isProd) console.log('📁 Created uploads folder:', uploadRoot);
+    console.log('📁 Created uploads folder:', uploadRoot);
   }
 
   if (!fs.existsSync(employeeDir)) {
     fs.mkdirSync(employeeDir, { recursive: true });
-    if (!isProd)
-      console.log('📁 Created employee uploads folder:', employeeDir);
+    console.log('📁 Created employee uploads folder:', employeeDir);
   }
 
   /* -----------------------------------------------------
@@ -57,11 +37,6 @@ async function bootstrap() {
   );
 
   /* -----------------------------------------------------
-     ✅ Global Error Formatting
-  ----------------------------------------------------- */
-  app.useGlobalFilters(new HttpExceptionFilter());
-
-  /* -----------------------------------------------------
      ✅ CORS Setup
   ----------------------------------------------------- */
   app.enableCors({
@@ -73,6 +48,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
+  
 
   /* -----------------------------------------------------
      ✅ Static File Serving
@@ -88,14 +64,11 @@ async function bootstrap() {
   const port = process.env.PORT || 4000;
   await app.listen(port);
 
-
-    console.log(`🚀 API running at: http://localhost:${port}`);
-    console.log(
-      `📂 Uploaded files available at: http://localhost:${port}/uploads/`,
-    );
-    console.log(`📄 Physical upload directory: ${employeeDir}`);
-    console.log("🔥 HRM BACKEND RESTARTED AT", new Date().toISOString());
-
+  console.log(`🚀 API running at: http://localhost:${port}`);
+  console.log(
+    `📂 Uploaded files available at: http://localhost:${port}/uploads/`,
+  );
+  console.log(`📄 Physical upload directory: ${employeeDir}`);
 }
 
 bootstrap();
