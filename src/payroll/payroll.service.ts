@@ -3,8 +3,8 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../prisma.service";
+} from '@nestjs/common';
+import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class PayrollService {
@@ -34,7 +34,7 @@ export class PayrollService {
       });
     } else {
       await this.prisma.payrollRun.create({
-        data: { periodStart: start, periodEnd: end, payDate, status: "DRAFT" },
+        data: { periodStart: start, periodEnd: end, payDate, status: 'DRAFT' },
       });
     }
   }
@@ -43,7 +43,7 @@ export class PayrollService {
   async startRun(periodStart: string, periodEnd: string, payDate: string) {
     if (!periodStart || !periodEnd || !payDate) {
       throw new BadRequestException(
-        "All fields (periodStart, periodEnd, payDate) are required."
+        'All fields (periodStart, periodEnd, payDate) are required.',
       );
     }
 
@@ -52,7 +52,7 @@ export class PayrollService {
         periodStart: new Date(periodStart),
         periodEnd: new Date(periodEnd),
         payDate: new Date(payDate),
-        status: "DRAFT",
+        status: 'DRAFT',
       },
     });
   }
@@ -60,7 +60,7 @@ export class PayrollService {
   // 📊 Get all payroll runs
   async getRuns() {
     return this.prisma.payrollRun.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -79,11 +79,12 @@ export class PayrollService {
       medical?: number;
       bonus?: number;
       other?: number;
-      epf?: number;
+      // Replaced EPF with Leave Deduction input
+      leaveDeduction?: number;
       professionalTax?: number;
       otherDeduction?: number;
     },
-    user: any
+    user: any,
   ) {
     const {
       employeeId,
@@ -91,14 +92,14 @@ export class PayrollService {
       gross,
       deductions = 0,
       net,
-      currency = "INR",
+      currency = 'INR',
       basic = 0,
       hra = 0,
       conveyance = 0,
       medical = 0,
       bonus = 0,
       other = 0,
-      epf = 0,
+      leaveDeduction = 0,
       professionalTax = 0,
       otherDeduction = 0,
     } = dto;
@@ -111,34 +112,36 @@ export class PayrollService {
         compensation: true,
       },
     });
-    if (!employee) throw new BadRequestException("Employee not found");
+    if (!employee) throw new BadRequestException('Employee not found');
 
-    const run = await this.prisma.payrollRun.findUnique({ where: { id: runId } });
-    if (!run) throw new BadRequestException("Payroll run not found");
+    const run = await this.prisma.payrollRun.findUnique({
+      where: { id: runId },
+    });
+    if (!run) throw new BadRequestException('Payroll run not found');
 
     const existing = await this.prisma.payslip.findFirst({
       where: { employeeId, payrollRunId: runId },
     });
     if (existing) {
       throw new BadRequestException(
-        "Payslip already exists for this employee and run."
+        'Payslip already exists for this employee and run.',
       );
     }
 
     // 🧾 Construct payslip lines
     const lines = [
-      { label: "Basic Salary", amount: basic },
-      { label: "HRA", amount: hra },
-      { label: "Conveyance", amount: conveyance },
-      { label: "Medical", amount: medical },
-      { label: "Bonus", amount: bonus },
-      { label: "Other Earnings", amount: other },
-      { label: "EPF", amount: -epf },
-      { label: "Professional Tax", amount: -professionalTax },
-      { label: "Other Deductions", amount: -otherDeduction },
-      { label: "Gross", amount: gross },
-      { label: "Total Deductions", amount: -deductions },
-      { label: "Net Pay", amount: net },
+      { label: 'Basic Salary', amount: basic },
+      { label: 'HRA', amount: hra },
+      { label: 'Conveyance', amount: conveyance },
+      { label: 'Medical', amount: medical },
+      { label: 'Bonus', amount: bonus },
+      { label: 'Other Earnings', amount: other },
+      { label: 'Leave Deduction', amount: -leaveDeduction },
+      { label: 'Professional Tax', amount: -professionalTax },
+      { label: 'Other Deductions', amount: -otherDeduction },
+      { label: 'Gross', amount: gross },
+      { label: 'Total Deductions', amount: -deductions },
+      { label: 'Net Pay', amount: net },
     ];
 
     // 🧱 Save to DB
@@ -157,10 +160,12 @@ export class PayrollService {
         medical,
         bonus,
         otherEarnings: other,
-        epf,
+        // Persist leave deduction explicitly in the model for reporting/queries
+        leaveDeduction,
+        epf: 0,
         professionalTax,
         otherDeductions: otherDeduction,
-        status: "APPROVED",
+        status: 'APPROVED',
       },
       include: {
         employee: {
@@ -192,7 +197,7 @@ export class PayrollService {
     for (const e of employees) {
       const gross = Number(e.compensation?.baseSalary ?? 0);
       const net = gross;
-      const currency = e.compensation?.currency ?? "INR";
+      const currency = e.compensation?.currency ?? 'INR';
 
       await this.prisma.payslip.create({
         data: {
@@ -203,8 +208,8 @@ export class PayrollService {
           net,
           currency,
           lines: [
-            { label: "Base Salary", amount: gross },
-            { label: "Net Pay", amount: net },
+            { label: 'Base Salary', amount: gross },
+            { label: 'Net Pay', amount: net },
           ],
         },
       });
@@ -212,7 +217,7 @@ export class PayrollService {
 
     return this.prisma.payrollRun.update({
       where: { id: runId },
-      data: { status: "APPROVED" },
+      data: { status: 'APPROVED' },
     });
   }
 
@@ -229,10 +234,10 @@ export class PayrollService {
         },
         payrollRun: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
 
-   // console.log("✅ getPayslips() count:", payslips.length);
+    // console.log("✅ getPayslips() count:", payslips.length);
     if (payslips.length) {
       // console.log(
       //   "🧾 Sample Payslip:",
@@ -260,7 +265,7 @@ export class PayrollService {
     });
 
     if (!payslip) throw new NotFoundException(`Payslip ${id} not found`);
-   // console.log("🧾 Single Payslip Debug:", JSON.stringify(payslip, null, 2));
+    // console.log("🧾 Single Payslip Debug:", JSON.stringify(payslip, null, 2));
     return payslip;
   }
 
@@ -276,7 +281,7 @@ export class PayrollService {
     });
 
     if (!employee) {
-      throw new NotFoundException("Employee record not found for this user");
+      throw new NotFoundException('Employee record not found for this user');
     }
 
     const now = new Date();
@@ -285,11 +290,11 @@ export class PayrollService {
         periodStart: { lte: now },
         periodEnd: { gte: now },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!run) {
-      throw new NotFoundException("No payroll run found for this month");
+      throw new NotFoundException('No payroll run found for this month');
     }
 
     const payslip = await this.prisma.payslip.findFirst({
@@ -310,10 +315,38 @@ export class PayrollService {
     });
 
     if (!payslip) {
-      throw new NotFoundException("No payslip found for this month");
+      throw new NotFoundException('No payslip found for this month');
     }
 
-   // console.log("🧾 My Current Payslip:", JSON.stringify(payslip, null, 2));
+    // console.log("🧾 My Current Payslip:", JSON.stringify(payslip, null, 2));
     return payslip;
+  }
+
+  // 👤 Get ALL payslips for current user
+  async getMyPayslips(userId: string) {
+    const employee = await this.prisma.employee.findFirst({
+      where: { userId },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee record not found for this user');
+    }
+
+    const payslips = await this.prisma.payslip.findMany({
+      where: { employeeId: employee.id },
+      include: {
+        payrollRun: true,
+        employee: {
+          include: {
+            bankDetail: true,
+            user: true,
+            compensation: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return payslips;
   }
 }

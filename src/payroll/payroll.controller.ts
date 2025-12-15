@@ -30,11 +30,10 @@ export class PayrollController {
 
   // 👑 Admin manually generates payslip for one employee
   @Roles('HR', 'ADMIN')
-  @Post("generate")
+  @Post('generate')
   async generatePayslip(@Body() body: any, @Req() req: any) {
     return this.svc.generatePayslipForEmployee(body, req.user);
   }
-  
 
   // 📤 Publish payroll run — auto-generate payslips for all employees
   @Roles('HR', 'ADMIN')
@@ -77,5 +76,12 @@ export class PayrollController {
   @Get('my-current')
   getMyCurrentPayslip(@Req() req) {
     return this.svc.getMyCurrentPayslip(req.user.sub);
+  }
+
+  // 👤 Employee: view ALL payslips
+  @Roles('EMPLOYEE', 'HR', 'ADMIN', 'MANAGER')
+  @Get('my')
+  getMyPayslips(@Req() req) {
+    return this.svc.getMyPayslips(req.user.sub);
   }
 }

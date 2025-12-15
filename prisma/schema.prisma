@@ -35,6 +35,12 @@ enum PayrollRunStatus {
   PAID
 }
 
+enum ConvenienceChargeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
@@ -134,16 +140,27 @@ model Compensation {
 }
 
 model ConvenienceCharge {
-  id          String    @id @default(cuid())
-  employeeId  String
-  employee    Employee  @relation(fields: [employeeId], references: [id])
+  id                String                      @id @default(cuid())
+  employeeId        String
+  employee          Employee                    @relation(fields: [employeeId], references: [id])
   
-  title       String      // e.g., "ID Card Fee", "Processing Fee"
-  amount      Float
-  date        DateTime
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  title             String                      // e.g., "ID Card Fee", "Processing Fee"
+  amount            Float
+  date              DateTime
+  description       String?                     // Optional: Why this charge?
+  
+  // Approval workflow fields
+  status            ConvenienceChargeStatus     @default(PENDING)
+  approvedBy        String?                     // User ID of approver
+  approvalDate      DateTime?
+  rejectionReason   String?                     // If rejected, why?
+  
+  // Payroll integration
+  payslipId         String?                     // Link to payslip (when added)
+  payslip           Payslip?                    @relation(fields: [payslipId], references: [id])
+  
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 }
 
 model Document {
@@ -261,7 +278,9 @@ model Payslip {
   medical           Float? @default(0)
   bonus             Float? @default(0)
   otherEarnings     Float? @default(0)
+  // Replaced EPF with Leave Deduction (kept epf for backward compatibility if needed)
   epf               Float? @default(0)
+  leaveDeduction    Float? @default(0)
   professionalTax   Float? @default(0)
   otherDeductions   Float? @default(0)
    
@@ -270,11 +289,11 @@ model Payslip {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  employee       Employee  @relation(fields: [employeeId], references: [id])
-  payrollRun     PayrollRun @relation(fields: [payrollRunId], references: [id])
-
-  @@unique([employeeId, payrollRunId], name: "employeeId_payrollRunId") 
-
+  employee           Employee              @relation(fields: [employeeId], references: [id])
+  payrollRun         PayrollRun            @relation(fields: [payrollRunId], references: [id])
+  convenienceCharges ConvenienceCharge[]
+  
+  @@unique([employeeId, payrollRunId], name: "employeeId_payrollRunId")
 }
 
 
