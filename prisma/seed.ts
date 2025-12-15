@@ -20,7 +20,7 @@ if (isProd) {
 }
 
 async function main() {
-  console.log('🌱 Starting database seeding...');
+  if (!isProd) console.log('🌱 Starting database seeding...');
   const adminPass = await bcrypt.hash('Admin@123', 10);
   const employeePass = await bcrypt.hash('Employee@123', 10);
 
@@ -43,7 +43,7 @@ async function main() {
       role: Role.ADMIN,
     },
   });
-  console.log('✅ 2 Admin users created');
+  if (!isProd) console.log('✅ 2 Admin users created');
 
   // 🔹 EMPLOYEES
 
@@ -91,7 +91,7 @@ async function main() {
       create: lp,
     });
   }
-  console.log(`✅ ${leavePolicies.length} leave policies created`);
+  if (!isProd) console.log(`✅ ${leavePolicies.length} leave policies created`);
 
   // 🔹 Dynamic Leave Balances
   const allEmployees = await p.employee.findMany({
@@ -134,7 +134,7 @@ async function main() {
       });
     }
   }
-  console.log('✅ Dynamic leave balances created');
+  if (!isProd) console.log('✅ Dynamic leave balances created');
 
   // 🔹 Holidays
   const holidays = [
@@ -171,7 +171,7 @@ async function main() {
       create: holiday,
     });
   }
-  console.log(`✅ ${holidays.length} holidays added`);
+  if (!isProd) console.log(`✅ ${holidays.length} holidays added`);
 
   // 🔹 Payroll Run for Current Month
   const now = new Date();
@@ -188,18 +188,20 @@ async function main() {
 
   // 🔹 Generate Payslips for Each Employee
 
-  console.log('\n🎉 Seeding completed successfully!');
-  console.log('🧠 Summary:');
-  console.log(`- Admin login: adminGmail / Admin@123`);
-  // console.log(`- Employee login: any employee email / Employee@123`);
-  console.log(`- Policies: ${leavePolicies.length}`);
-  console.log(`- Holidays: ${holidays.length}`);
-  console.log(
-    `- Payroll run: ${currentMonthStart.toLocaleString('default', {
-      month: 'long',
-      year: 'numeric',
-    })}`,
-  );
+  if (!isProd) {
+    console.log('\n🎉 Seeding completed successfully!');
+    console.log('🧠 Summary:');
+    console.log(`- Admin login: adminGmail / Admin@123`);
+    // console.log(`- Employee login: any employee email / Employee@123`);
+    console.log(`- Policies: ${leavePolicies.length}`);
+    console.log(`- Holidays: ${holidays.length}`);
+    console.log(
+      `- Payroll run: ${currentMonthStart.toLocaleString('default', {
+        month: 'long',
+        year: 'numeric',
+      })}`,
+    );
+  }
 }
 
 main()

@@ -9,7 +9,6 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common';
 import { ConvenienceChargeService } from './convenience-charge.service';
 import { CreateConvenienceChargeDto } from './dto/create-convenience-charge.dto';
@@ -42,7 +41,7 @@ export class ConvenienceChargeController {
    * Ensures req.user always has consistent structure
    */
   private normalizeUser(req: Request): NormalizedUser {
-    const user = req.user as any;
+    const user = req.user as Record<string, unknown> | undefined;
     if (!user || !user.sub) {
       throw new ForbiddenException('User not authenticated');
     }
@@ -50,10 +49,10 @@ export class ConvenienceChargeController {
       throw new ForbiddenException('Employee ID not found in session');
     }
     return {
-      sub: user.sub,
-      employeeId: user.employeeId,
-      role: user.role || 'EMPLOYEE',
-      email: user.email,
+      sub: user.sub as string,
+      employeeId: user.employeeId as string,
+      role: (user.role as 'EMPLOYEE' | 'HR' | 'ADMIN') || 'EMPLOYEE',
+      email: user.email as string | undefined,
     };
   }
 
@@ -248,7 +247,10 @@ export class ConvenienceChargeController {
     @Param('employeeId') employeeId: string,
     @Req() req: Request,
   ) {
-    const user = req.user as any;
+    const user = req.user as Record<string, unknown> | undefined;
+    if (!user) {
+      throw new ForbiddenException('User not authenticated');
+    }
 
     // If user is EMPLOYEE, they can only access their own data
     if (user.role === 'EMPLOYEE') {
@@ -264,8 +266,8 @@ export class ConvenienceChargeController {
 
     return this.convenienceChargeService.findByEmployeeId(
       employeeId,
-      user.role,
-      user.employeeId,
+      user.role as 'EMPLOYEE' | 'HR' | 'ADMIN',
+      user.employeeId as string,
     );
   }
 }

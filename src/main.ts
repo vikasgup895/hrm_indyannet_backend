@@ -36,12 +36,13 @@ async function bootstrap() {
 
   if (!fs.existsSync(uploadRoot)) {
     fs.mkdirSync(uploadRoot, { recursive: true });
-    console.log('📁 Created uploads folder:', uploadRoot);
+    if (!isProd) console.log('📁 Created uploads folder:', uploadRoot);
   }
 
   if (!fs.existsSync(employeeDir)) {
     fs.mkdirSync(employeeDir, { recursive: true });
-    console.log('📁 Created employee uploads folder:', employeeDir);
+    if (!isProd)
+      console.log('📁 Created employee uploads folder:', employeeDir);
   }
 
   /* -----------------------------------------------------
@@ -87,11 +88,13 @@ async function bootstrap() {
   const port = process.env.PORT || 4000;
   await app.listen(port);
 
-  console.log(`🚀 API running at: http://localhost:${port}`);
-  console.log(
-    `📂 Uploaded files available at: http://localhost:${port}/uploads/`,
-  );
-  console.log(`📄 Physical upload directory: ${employeeDir}`);
+  if (!isProd) {
+    console.log(`🚀 API running at: http://localhost:${port}`);
+    console.log(
+      `📂 Uploaded files available at: http://localhost:${port}/uploads/`,
+    );
+    console.log(`📄 Physical upload directory: ${employeeDir}`);
+  }
 }
 
 bootstrap();
