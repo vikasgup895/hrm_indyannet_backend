@@ -207,6 +207,18 @@ async create(dto: CreateEmployeeDto, currentUser?: any): Promise<Employee> {
   
     //
     // ───────────────────────────────────────────────
+    // NORMALIZE DATE FIELDS (Convert to ISO-8601 DateTime)
+    // ───────────────────────────────────────────────
+    //
+    if (dto.birthdate && typeof dto.birthdate === 'string') {
+      // If it's a date string like "2000-01-15", convert to ISO DateTime
+      if (!dto.birthdate.includes('T')) {
+        dto.birthdate = new Date(dto.birthdate).toISOString();
+      }
+    }
+
+    //
+    // ───────────────────────────────────────────────
     // NORMALIZE BANK DETAIL FIELDS
     // ───────────────────────────────────────────────
     //
