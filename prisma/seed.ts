@@ -6,6 +6,19 @@ import * as bcrypt from 'bcryptjs';
 
 const p = new PrismaClient();
 
+// 🔇 Silence console output when running seed in production
+const isProd = process.env.NODE_ENV === 'production';
+if (isProd) {
+  const noop = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (console as any).debug = noop;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (console as any).info = noop;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (console as any).log = noop;
+  // keep warn and error for visibility in prod
+}
+
 async function main() {
   console.log('🌱 Starting database seeding...');
   const adminPass = await bcrypt.hash('Admin@123', 10);
@@ -33,7 +46,7 @@ async function main() {
   console.log('✅ 2 Admin users created');
 
   // 🔹 EMPLOYEES
-  
+
   // 🔹 Leave Policies
   const leavePolicies = [
     {
@@ -84,7 +97,7 @@ async function main() {
   const allEmployees = await p.employee.findMany({
     select: { id: true },
   });
-    const allPolicies = await p.leavePolicy.findMany();
+  const allPolicies = await p.leavePolicy.findMany();
   const currentPeriod = new Date().toISOString().slice(0, 7);
 
   for (const emp of allEmployees) {
@@ -173,14 +186,12 @@ async function main() {
     },
   });
 
-  
   // 🔹 Generate Payslips for Each Employee
-  
 
   console.log('\n🎉 Seeding completed successfully!');
   console.log('🧠 Summary:');
   console.log(`- Admin login: adminGmail / Admin@123`);
- // console.log(`- Employee login: any employee email / Employee@123`);
+  // console.log(`- Employee login: any employee email / Employee@123`);
   console.log(`- Policies: ${leavePolicies.length}`);
   console.log(`- Holidays: ${holidays.length}`);
   console.log(
