@@ -148,35 +148,7 @@ export class ConvenienceChargeController {
     return this.convenienceChargeService.create(dto);
   }
 
-  /**
-   * [LEGACY] 📋 Get convenience charges for an employee
-   */
-  @Roles('ADMIN', 'HR', 'EMPLOYEE')
-  @Get(':employeeId')
-  async findByEmployeeIdLegacy(
-    @Param('employeeId') employeeId: string,
-    @Req() req: Request,
-  ) {
-    const user = req.user as any;
-
-    // If user is EMPLOYEE, they can only access their own data
-    if (user.role === 'EMPLOYEE') {
-      if (!user.employeeId) {
-        throw new ForbiddenException('Employee ID not found in your session');
-      }
-      if (user.employeeId !== employeeId) {
-        throw new ForbiddenException(
-          'You can only access your own convenience charges',
-        );
-      }
-    }
-
-    return this.convenienceChargeService.findByEmployeeId(
-      employeeId,
-      user.role,
-      user.employeeId,
-    );
-  }
+  
 
   /**
    * 🔍 Get a specific convenience charge by ID
@@ -234,6 +206,36 @@ export class ConvenienceChargeController {
     return this.convenienceChargeService.bulkCreateByEmployee(
       user.employeeId,
       body.charges,
+    );
+  }
+
+  /**
+   * [LEGACY] 📋 Get convenience charges for an employee
+   */
+  @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  @Get(':employeeId')
+  async findByEmployeeIdLegacy(
+    @Param('employeeId') employeeId: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as any;
+
+    // If user is EMPLOYEE, they can only access their own data
+    if (user.role === 'EMPLOYEE') {
+      if (!user.employeeId) {
+        throw new ForbiddenException('Employee ID not found in your session');
+      }
+      if (user.employeeId !== employeeId) {
+        throw new ForbiddenException(
+          'You can only access your own convenience charges',
+        );
+      }
+    }
+
+    return this.convenienceChargeService.findByEmployeeId(
+      employeeId,
+      user.role,
+      user.employeeId,
     );
   }
 }
