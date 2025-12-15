@@ -4,18 +4,19 @@ import { ExtractJwt, Strategy, JwtFromRequestFunction } from 'passport-jwt';
 
 export interface JwtPayload {
   sub: string;
-  role: 'EMPLOYEE' | 'HR' | 'ADMIN';
+  role: string;
   email?: string;
-  employeeId?: string;
+  employeeId?: string; // ✅ Include employee ID for employee-specific queries
 }
 
 export interface AuthenticatedUser {
   sub: string;
-  role: 'EMPLOYEE' | 'HR' | 'ADMIN';
+  role: string;
   email?: string;
-  employeeId?: string;
+  employeeId?: string; // ✅ Matches Prisma employee relation
 }
 
+// 👇 Properly typed JWT extractor
 const jwtExtractor: JwtFromRequestFunction =
   ExtractJwt.fromAuthHeaderAsBearerToken() as unknown as JwtFromRequestFunction;
 
@@ -30,23 +31,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   /**
-   * ✅ Validate JWT payload and attach normalized user context
+   * ✅ Validate JWT payload and attach user context
    * This object will become available as `req.user` in controllers
-   *
-   * Ensures consistent user object structure:
-   * {
-   *   sub: string (user ID);
-   *   role: "EMPLOYEE" | "HR" | "ADMIN";
-   *   email?: string;
-   *   employeeId?: string;
-   * }
    */
   validate(payload: JwtPayload): AuthenticatedUser {
     return {
       sub: payload.sub,
-      role: payload.role || 'EMPLOYEE',
+      role: payload.role,
       email: payload.email,
-      employeeId: payload.employeeId,
+      employeeId: payload.employeeId ?? undefined, // 🧠 optional fallback
     };
   }
 }
