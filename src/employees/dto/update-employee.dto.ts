@@ -66,6 +66,10 @@ export class UpdateEmployeeDto {
   birthdate?: string;
 
   @IsOptional()
+  @IsDateString()
+  hireDate?: string;
+
+  @IsOptional()
   @IsString()
   location?: string;
 

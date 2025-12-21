@@ -146,31 +146,22 @@ export class EmployeesController {
   constructor(
     private readonly svc: EmployeesService,
     private readonly prisma: PrismaService,
-
-  ) { }
-
+  ) {}
 
   // ────────────────
   //  Change Password
   // ────────────────
-  // Change Password 
-  @Put("change-password")
+  // Change Password
+  @Put('change-password')
   async changePassword(@Req() req, @Body() body: any) {
     const userId = req.user?.id ?? req.user?.sub;
-  
+
     if (!userId) {
-      throw new BadRequestException("User ID missing from token");
+      throw new BadRequestException('User ID missing from token');
     }
-  
-    return this.svc.changePassword(
-      userId,
-      body.oldPassword,
-      body.newPassword
-    );
+
+    return this.svc.changePassword(userId, body.oldPassword, body.newPassword);
   }
-  
-
-
 
   // ────────────────
   // 1️⃣ Profile of Logged-in User
@@ -219,8 +210,6 @@ export class EmployeesController {
     throw new NotFoundException('Profile not found');
   }
 
-
-
   // ────────────────
   // 2️⃣ Update current user's profile
   // ────────────────
@@ -234,7 +223,6 @@ export class EmployeesController {
 
     return this.svc.update(employee.id, dto, req.user);
   }
-
 
   // ────────────────
   // 3️⃣ List Employees
@@ -261,12 +249,15 @@ export class EmployeesController {
     return this.svc.create(dto, req.user);
   }
 
-
   // ────────────────
   // 6️⃣ Update Employee by ID (admin/hr)
   // ────────────────
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateEmployeeDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateEmployeeDto,
+    @Req() req: any,
+  ) {
     return this.svc.update(id, dto, req.user);
   }
 
@@ -291,7 +282,7 @@ export class EmployeesController {
   async uploadDocument(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
-    @Req() req: any
+    @Req() req: any,
   ) {
     // 🛑 EMPLOYEE SECURITY CHECK (VERY IMPORTANT)
     if (req.user.role === 'EMPLOYEE' && req.user.employeeId !== id) {
@@ -313,14 +304,10 @@ export class EmployeesController {
     };
   }
 
-
-
-
   @Delete(':id')
   async deleteEmployee(@Param('id') id: string) {
     return this.svc.deleteEmployee(id);
   }
-
 
   // ────────────────
   // 8️⃣ Basic List
@@ -330,7 +317,16 @@ export class EmployeesController {
     return this.svc.getAllBasic();
   }
 
-  
-  
-
+  // ────────────────
+  // 9️⃣ Delete Document (HR/Admin only)
+  // ────────────────
+  @Delete(':employeeId/documents/:docId')
+  @Roles('HR', 'ADMIN')
+  async deleteDocument(
+    @Param('employeeId') employeeId: string,
+    @Param('docId') docId: string,
+    @Req() req: any,
+  ) {
+    return this.svc.deleteDocument(employeeId, docId, req.user);
+  }
 }

@@ -510,4 +510,40 @@ export class EmployeesService {
 
     return { message: 'Password updated successfully' };
   }
+
+  // Delete a document (HR/Admin only)
+  async deleteDocument(employeeId: string, docId: string, currentUser?: any) {
+    // Verify employee exists
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    // Check authorization: only HR/ADMIN or the document owner can delete
+    const role = currentUser?.role;
+    const isAdminOrHR = role === 'ADMIN' || role === 'HR';
+
+    if (!isAdminOrHR) {
+      throw new ForbiddenException('Only HR or Admin can delete documents');
+    }
+
+    // Verify document exists and belongs to this employee
+    const doc = await this.prisma.document.findUnique({
+      where: { id: docId },
+    });
+
+    if (!doc || doc.employeeId !== employeeId) {
+      throw new NotFoundException('Document not found');
+    }
+
+    // Delete the document
+    await this.prisma.document.delete({
+      where: { id: docId },
+    });
+
+    return { message: 'Document deleted successfully' };
+  }
 }
