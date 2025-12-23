@@ -1,10 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import {
+  getDefaultPayDateForMonth,
+  getDefaultPayDateForPeriodDate,
+} from './date.util';
 
 @Injectable()
 export class PayrollService {
@@ -18,7 +21,8 @@ export class PayrollService {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const payDate = new Date(now.getFullYear(), now.getMonth() + 1, 5);
+    // Payment date by policy (10th of next month)
+    const payDate = getDefaultPayDateForPeriodDate(now);
 
     const existing = await this.prisma.payrollRun.findFirst({
       where: {
@@ -37,6 +41,39 @@ export class PayrollService {
         data: { periodStart: start, periodEnd: end, payDate, status: 'DRAFT' },
       });
     }
+  }
+
+  // 🔧 Auto-create payroll run if it doesn't exist for a given month
+  // Payment date is automatically set to the 10th of next month
+  private async ensurePayrollRunForMonth(
+    year: number,
+    month: number,
+  ): Promise<any> {
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+    // Payment date by policy (10th of next month)
+    const payDate = getDefaultPayDateForMonth(year, month);
+
+    const existing = await this.prisma.payrollRun.findFirst({
+      where: {
+        periodStart: { lte: start },
+        periodEnd: { gte: start },
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    // Auto-create new payroll run for the month with DRAFT status
+    return await this.prisma.payrollRun.create({
+      data: {
+        periodStart: start,
+        periodEnd: end,
+        payDate,
+        status: 'DRAFT',
+      },
+    });
   }
 
   // 🧾 Create a new payroll run
@@ -84,7 +121,7 @@ export class PayrollService {
       professionalTax?: number;
       otherDeduction?: number;
     },
-    user: any,
+    _user: any,
   ) {
     const {
       employeeId,
@@ -179,6 +216,14 @@ export class PayrollService {
       },
     });
 
+    // Update payroll run status to PAID when first payslip is created
+    if (run && run.status === 'DRAFT') {
+      await this.prisma.payrollRun.update({
+        where: { id: runId },
+        data: { status: 'PAID' },
+      });
+    }
+
     //console.log("🧾 Payslip Generated:", JSON.stringify(payslip, null, 2));
     return payslip;
   }
@@ -215,9 +260,10 @@ export class PayrollService {
       });
     }
 
+    // Update payroll run status to PAID after generating all payslips
     return this.prisma.payrollRun.update({
       where: { id: runId },
-      data: { status: 'APPROVED' },
+      data: { status: 'PAID' },
     });
   }
 

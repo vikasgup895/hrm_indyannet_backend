@@ -56,14 +56,7 @@ export class PayrollController {
     return this.svc.getPayslips();
   }
 
-  // 👤 Employee: view only current month’s payslip
-  // @Roles('EMPLOYEE', 'HR', 'ADMIN', 'MANAGER')
-  // @Get('my-current')
-  // getMyCurrentPayslip(@Req() req) {
-  //   return this.svc.getMyCurrentPayslip(req.user.sub);
-  // }
-
-  // 🔍 Shared route: view one payslip by ID
+  //  Shared route: view one payslip by ID
   @Roles('HR', 'ADMIN', 'MANAGER', 'EMPLOYEE')
   @Get('payslips/:id')
   getPayslip(@Param('id') id: string) {

@@ -51,6 +51,4 @@ export class AuthController {
   health() {
     return { ok: true, ts: new Date().toISOString() };
   }
-
-  
 }

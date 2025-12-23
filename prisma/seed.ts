@@ -33,7 +33,7 @@ async function main() {
   console.log('✅ 2 Admin users created');
 
   // 🔹 EMPLOYEES
-  
+
   // 🔹 Leave Policies
   const leavePolicies = [
     {
@@ -84,7 +84,7 @@ async function main() {
   const allEmployees = await p.employee.findMany({
     select: { id: true },
   });
-    const allPolicies = await p.leavePolicy.findMany();
+  const allPolicies = await p.leavePolicy.findMany();
   const currentPeriod = new Date().toISOString().slice(0, 7);
 
   for (const emp of allEmployees) {
@@ -164,7 +164,8 @@ async function main() {
   const now = new Date();
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const nextPayDate = new Date(now.getFullYear(), now.getMonth() + 1, 5);
+  // Default pay date policy: 10th of next month
+  const nextPayDate = new Date(now.getFullYear(), now.getMonth() + 1, 10);
 
   const existingRun = await p.payrollRun.findFirst({
     where: {
@@ -173,14 +174,12 @@ async function main() {
     },
   });
 
-  
   // 🔹 Generate Payslips for Each Employee
-  
 
   console.log('\n🎉 Seeding completed successfully!');
   console.log('🧠 Summary:');
   console.log(`- Admin login: adminGmail / Admin@123`);
- // console.log(`- Employee login: any employee email / Employee@123`);
+  // console.log(`- Employee login: any employee email / Employee@123`);
   console.log(`- Policies: ${leavePolicies.length}`);
   console.log(`- Holidays: ${holidays.length}`);
   console.log(

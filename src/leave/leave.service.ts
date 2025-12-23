@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -683,7 +681,6 @@
 //   }
 // }
 
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   NotFoundException,
@@ -783,43 +780,47 @@ export class LeaveService {
       where: { employeeId: employee.id, policyId, period: currentPeriod },
     });
 
-    if (policy.name === "Special Leave") {
+    if (policy.name === 'Special Leave') {
       // --- Monthly limit logic (max 1 per month) ---
       const requestYear = new Date(startDate).getFullYear();
       const requestMonth = new Date(startDate).getMonth();
-    
+
       // Count all approved or pending special leaves in the same month for this employee
       const specialLeaveCountThisMonth = await this.prisma.leaveRequest.count({
         where: {
           employeeId: employee.id,
           policyId: policy.id,
-          status: { in: ["PENDING", "APPROVED"] },
+          status: { in: ['PENDING', 'APPROVED'] },
           startDate: {
             gte: new Date(requestYear, requestMonth, 1),
-            lt: new Date(requestYear, requestMonth + 1, 1)
-          }
-        }
+            lt: new Date(requestYear, requestMonth + 1, 1),
+          },
+        },
       });
-    
+
       if (specialLeaveCountThisMonth >= 1) {
-        throw new BadRequestException("You can apply for only 1 Special Leave per month.");
+        throw new BadRequestException(
+          'You can apply for only 1 Special Leave per month.',
+        );
       }
-    
+
       // --- Yearly limit logic (max 12 per year) ---
       const specialLeaveCountThisYear = await this.prisma.leaveRequest.count({
         where: {
           employeeId: employee.id,
           policyId: policy.id,
-          status: { in: ["PENDING", "APPROVED"] },
+          status: { in: ['PENDING', 'APPROVED'] },
           startDate: {
             gte: new Date(requestYear, 0, 1),
-            lt: new Date(requestYear + 1, 0, 1)
-          }
-        }
+            lt: new Date(requestYear + 1, 0, 1),
+          },
+        },
       });
-    
+
       if (specialLeaveCountThisYear >= 12) {
-        throw new BadRequestException("You cannot exceed 12 Special Leaves per year.");
+        throw new BadRequestException(
+          'You cannot exceed 12 Special Leaves per year.',
+        );
       }
     }
 

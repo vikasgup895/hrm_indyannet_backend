@@ -48,7 +48,6 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
-  
 
   /* -----------------------------------------------------
      ✅ Static File Serving

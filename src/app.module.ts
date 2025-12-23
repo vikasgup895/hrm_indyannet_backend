@@ -18,7 +18,7 @@ import { MailerModule } from './mailer/mailer.module';
     EmployeesModule,
     LeaveModule,
     PayrollModule,
-    MailerModule,  
+    MailerModule,
     InsuranceModule,
     DashboardModule,
   ],

@@ -4,7 +4,6 @@ import { EmployeesService } from './employees.service';
 import { PrismaService } from '../prisma.service';
 import { MailerModule } from '../mailer/mailer.module';
 
-
 @Module({
   imports: [MailerModule],
   controllers: [EmployeesController],
