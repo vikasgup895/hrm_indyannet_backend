@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Get,
+  Patch,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -47,6 +48,20 @@ export class PayrollController {
   @Get('runs')
   getRuns() {
     return this.svc.getRuns();
+  }
+
+  // 🔍 Get single payroll run by ID
+  @Roles('HR', 'ADMIN')
+  @Get('runs/:id')
+  getRun(@Param('id') id: string) {
+    return this.svc.getRun(id);
+  }
+
+  // ✏️ Update payroll run (e.g., change payDate)
+  @Roles('HR', 'ADMIN')
+  @Patch('runs/:id')
+  updateRun(@Param('id') id: string, @Body() body: { payDate?: string }) {
+    return this.svc.updateRun(id, body);
   }
 
   // 📜 View all payslips (Admin / HR / Manager)

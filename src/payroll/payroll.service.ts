@@ -101,6 +101,30 @@ export class PayrollService {
     });
   }
 
+  // 🔍 Get single payroll run by ID
+  async getRun(id: string) {
+    const run = await this.prisma.payrollRun.findUnique({
+      where: { id },
+    });
+    if (!run) throw new NotFoundException(`Payroll run ${id} not found`);
+    return run;
+  }
+
+  // ✏️ Update payroll run (e.g., change payDate)
+  async updateRun(id: string, data: { payDate?: string }) {
+    const run = await this.prisma.payrollRun.findUnique({
+      where: { id },
+    });
+    if (!run) throw new NotFoundException(`Payroll run ${id} not found`);
+
+    return this.prisma.payrollRun.update({
+      where: { id },
+      data: {
+        ...(data.payDate && { payDate: new Date(data.payDate) }),
+      },
+    });
+  }
+
   // 👑 Admin manually generates a payslip for a single employee
   async generatePayslipForEmployee(
     dto: {
