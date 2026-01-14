@@ -14,6 +14,7 @@ import {
   UpdateBankDetailDto,
 } from './dto/bank-detail.dto';
 import { MailerService } from '../mailer/mailer.service'; // << ADD THIS
+import { AuthenticatedUser } from '../auth/jwt.strategy';
 
 @Injectable()
 export class EmployeesService {
@@ -23,10 +24,20 @@ export class EmployeesService {
   ) {}
 
   // ────────────────
+  // ✅ Helper: Check if should hide MD/CAO employees
+  // ────────────────
+  private shouldHideMDCAO(user?: AuthenticatedUser): boolean {
+    return !user || (user.role !== 'MD' && user.role !== 'CAO');
+  }
+
+  // ────────────────
   // 1️⃣ List All Employees
   // ────────────────
-  async list(): Promise<Employee[]> {
-    return this.prisma.employee.findMany({
+  async list(user: AuthenticatedUser): Promise<Employee[]> {
+    // Fetch all employees with user relationship
+    // console.log('🔍 [EmployeeService.list] User role:', user?.role);
+    
+    const allEmployees = await this.prisma.employee.findMany({
       include: {
         manager: { select: { id: true, firstName: true, lastName: true } },
         documents: true,
@@ -36,12 +47,30 @@ export class EmployeesService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // If user is not MD/CAO, filter out MD/CAO employees
+    if (this.shouldHideMDCAO(user)) {
+      // console.log('🔍 [EmployeeService.list] Filtering out MD/CAO employees');
+      const filtered = allEmployees.filter(emp => {
+        const empRole = emp.user?.role;
+        const isExcluded = empRole === 'MD' || empRole === 'CAO';
+        if (isExcluded) {
+            // console.log(`  ❌ Excluding: ${emp.firstName} ${emp.lastName} (${empRole})`);
+        }
+        return !isExcluded;
+      });
+      // console.log(`🔍 [EmployeeService.list] Returned ${filtered.length} employees (excluded ${allEmployees.length - filtered.length})`);
+      return filtered;
+    }
+
+    // console.log(`🔍 [EmployeeService.list] Returning all ${allEmployees.length} employees`);
+    return allEmployees;
   }
 
   // ────────────────
   // 2️⃣ Get Employee by ID
   // ────────────────
-  async get(id: string): Promise<Employee | null> {
+  async get(id: string, user: AuthenticatedUser): Promise<Employee | null> {
     const emp = await this.prisma.employee.findUnique({
       where: { id },
       include: {
@@ -53,6 +82,12 @@ export class EmployeesService {
       },
     });
     if (!emp) throw new NotFoundException('Employee not found');
+
+    // If user is not MD/CAO and employee is MD/CAO, forbid access
+    if (this.shouldHideMDCAO(user) && emp.user?.role && ['MD', 'CAO'].includes(emp.user.role)) {
+      throw new ForbiddenException('Not authorized to view this employee');
+    }
+
     return emp;
   }
 
@@ -467,18 +502,41 @@ export class EmployeesService {
   // ────────────────
   // 8️⃣ Basic List for Dropdowns
   // ────────────────
-  async getAllBasic() {
-    return this.prisma.employee.findMany({
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        department: true,
-        workEmail: true,
-        status: true,
+  async getAllBasic(user?: AuthenticatedUser) {
+    // Fetch all employees
+    const allEmployees = await this.prisma.employee.findMany({
+      include: {
+        user: { select: { role: true } },
       },
       orderBy: { firstName: 'asc' },
     });
+
+    // If user is not MD/CAO, filter out MD/CAO employees
+    if (this.shouldHideMDCAO(user)) {
+      return allEmployees
+        .filter(emp => {
+          const empRole = emp.user?.role;
+          return empRole !== 'MD' && empRole !== 'CAO';
+        })
+        .map(emp => ({
+          id: emp.id,
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          department: emp.department,
+          workEmail: emp.workEmail,
+          status: emp.status,
+        }));
+    }
+
+    // Return all for MD/CAO users
+    return allEmployees.map(emp => ({
+      id: emp.id,
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      department: emp.department,
+      workEmail: emp.workEmail,
+      status: emp.status,
+    }));
   }
 
   async changePassword(

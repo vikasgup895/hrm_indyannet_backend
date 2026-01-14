@@ -35,31 +35,31 @@ export class InsuranceController {
   constructor(private readonly insuranceService: InsuranceService) {}
 
   /**
-   * 🧾 Create a new insurance record (ADMIN/HR only)
+   * 🧾 Create a new insurance record (ADMIN/HR/MD/CAO only)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post()
   create(@Body() dto: CreateInsuranceDto) {
     return this.insuranceService.create(dto);
   }
 
   /**
-   * 📋 Get all insurance records (ADMIN/HR) or own (EMPLOYEE)
+   * 📋 Get all insurance records (ADMIN/HR/MD/CAO) or own (EMPLOYEE)
    */
-  @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO', 'EMPLOYEE')
   @Get()
   async findAll(@Req() req: Request) {
     const user = req.user as any;
-    return this.insuranceService.findAll(user.role, user.employeeId);
+    return this.insuranceService.findAll(user, user.role, user.employeeId);
   }
 
   /**
-   * � List insurance documents (ADMIN/HR/EMPLOYEE)
+   * 💾 List insurance documents (ADMIN/HR/MD/CAO/EMPLOYEE)
    * - Filter by employeeId or insuranceId (policy number)
    * - Employees only see their own documents
    * NOTE: Placed BEFORE dynamic :id route to prevent it being captured as an id.
    */
-  @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO', 'EMPLOYEE')
   @Get('docs')
   async listDocuments(
     @Query('employeeId') employeeId: string,
@@ -76,10 +76,10 @@ export class InsuranceController {
   }
 
   /**
-   * � Delete an insurance document (ADMIN/HR only)
+   * 🗑 Delete an insurance document (ADMIN/HR/MD/CAO only)
    * NOTE: Placed before dynamic :id route.
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Delete('docs/:id')
   async deleteDocument(@Param('id') id: string) {
     return this.insuranceService.deleteDocument(id);
@@ -96,18 +96,19 @@ export class InsuranceController {
   }
 
   /**
-   * 🔍 Get a specific insurance record by ID (ADMIN/HR/EMPLOYEE)
+   * 🔍 Get a specific insurance record by ID (ADMIN/HR/MD/CAO/EMPLOYEE)
    */
-  @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO', 'EMPLOYEE')
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.insuranceService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as any;
+    return this.insuranceService.findOne(id, user);
   }
 
   /**
-   * 🧩 Update a specific insurance record (ADMIN/HR only)
+   * 🧩 Update a specific insurance record (ADMIN/HR/MD/CAO only)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateInsuranceDto) {
     return this.insuranceService.update(id, dto);
@@ -115,9 +116,9 @@ export class InsuranceController {
 
   /**
    * 💰 Update financial data (bonus, convenience fee, etc)
-   * ADMIN/HR can update any record
+   * ADMIN/HR/MD/CAO can update any record
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Put(':id/financial')
   updateFinancial(@Param('id') id: string, @Body() dto: UpdateFinancialDto) {
     return this.insuranceService.updateFinancial(id, dto);
@@ -149,19 +150,19 @@ export class InsuranceController {
   }
 
   /**
-   * 🗑 Delete an insurance record (ADMIN/HR only)
+   * 🗑 Delete an insurance record (ADMIN/HR/MD/CAO only)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.insuranceService.remove(id);
   }
 
   /**
-   * 📎 Upload insurance-related document (ADMIN/HR)
+   * 📎 Upload insurance-related document (ADMIN/HR/MD/CAO)
    * Stores file under uploads/insurance and records in Document table
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post('docs')
   @UseInterceptors(
     FileInterceptor('file', {

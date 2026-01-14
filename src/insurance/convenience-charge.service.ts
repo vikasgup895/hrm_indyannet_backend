@@ -11,6 +11,13 @@ import { UpdateConvenienceChargeDto } from './dto/update-convenience-charge.dto'
 export class ConvenienceChargeService {
   constructor(private prisma: PrismaService) {}
 
+  // ────────────────
+  // ✅ Helper: Check if should hide MD/CAO employees
+  // ────────────────
+  private shouldHideMDCAO(user?: any): boolean {
+    return !user || (user.role !== 'MD' && user.role !== 'CAO');
+  }
+
   /**
    * Employee creates a convenience charge (PENDING approval)
    */
@@ -38,6 +45,7 @@ export class ConvenienceChargeService {
     employeeId: string,
     role: string,
     requesterEmployeeId?: string,
+    user?: any,
   ) {
     // Employees can only see their own
     if (role === 'EMPLOYEE' && requesterEmployeeId !== employeeId) {
@@ -61,11 +69,16 @@ export class ConvenienceChargeService {
   }
 
   /**
-   * Get all PENDING charges (for HR/Admin to review)
+   * Get all PENDING charges (for HR/Admin/MD/CAO to review)
    */
-  async getPendingCharges() {
+  async getPendingCharges(user?: any) {
+    // If user is not MD/CAO, hide MD/CAO pending charges
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status: 'PENDING', employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : { status: 'PENDING' };
+
     return this.prisma.convenienceCharge.findMany({
-      where: { status: 'PENDING' },
+      where,
       include: {
         employee: {
           select: {
@@ -84,9 +97,14 @@ export class ConvenienceChargeService {
   /**
    * Get charges by status
    */
-  async getChargesByStatus(status: 'PENDING' | 'APPROVED' | 'REJECTED') {
+  async getChargesByStatus(status: 'PENDING' | 'APPROVED' | 'REJECTED', user?: any) {
+    // If user is not MD/CAO, hide MD/CAO charges
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status, employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : { status };
+
     return this.prisma.convenienceCharge.findMany({
-      where: { status },
+      where,
       include: {
         employee: {
           select: {
@@ -211,12 +229,18 @@ export class ConvenienceChargeService {
   /**
    * Get a specific charge
    */
-  async findOne(id: string) {
+  async findOne(id: string, user?: any) {
     const charge = await this.prisma.convenienceCharge.findUnique({
       where: { id },
-      include: { employee: true },
+      include: { employee: { include: { user: true } } },
     });
     if (!charge) throw new NotFoundException('Convenience charge not found');
+
+    // If user is not MD/CAO and charge is for MD/CAO, forbid access
+    if (this.shouldHideMDCAO(user) && charge.employee?.user?.role && ['MD', 'CAO'].includes(charge.employee.user.role)) {
+      throw new ForbiddenException('Not authorized to view this charge');
+    }
+
     return charge;
   }
 

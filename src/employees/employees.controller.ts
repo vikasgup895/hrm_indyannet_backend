@@ -226,22 +226,22 @@ export class EmployeesController {
   // 3️⃣ List Employees
   // ────────────────
   @Get()
-  async list() {
-    return this.svc.list();
+  async list(@Req() req: any) {
+    return this.svc.list(req.user);
   }
 
   // ────────────────
   // 4️⃣ Get Employee by ID
   // ────────────────
   @Get(':id')
-  async get(@Param('id') id: string) {
-    return this.svc.get(id);
+  async get(@Param('id') id: string, @Req() req: any) {
+    return this.svc.get(id, req.user);
   }
 
   // ────────────────
   // 5️⃣ Create New Employee
   // ────────────────
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post()
   async create(@Req() req: any, @Body() dto: CreateEmployeeDto) {
     return this.svc.create(dto, req.user);
@@ -311,8 +311,8 @@ export class EmployeesController {
   // 8️⃣ Basic List
   // ────────────────
   @Get('basic/all')
-  async getAllBasic() {
-    return this.svc.getAllBasic();
+  async getAllBasic(@Req() req: any) {
+    return this.svc.getAllBasic(req.user);
   }
 
   // ────────────────

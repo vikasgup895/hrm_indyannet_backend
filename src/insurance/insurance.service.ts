@@ -14,6 +14,13 @@ import { UpdateFinancialDto } from './dto/update-financial.dto';
 export class InsuranceService {
   constructor(private prisma: PrismaService) {}
 
+  // ────────────────
+  // ✅ Helper: Check if should hide MD/CAO employees
+  // ────────────────
+  private shouldHideMDCAO(user?: any): boolean {
+    return !user || (user.role !== 'MD' && user.role !== 'CAO');
+  }
+
   async create(dto: CreateInsuranceDto) {
     const employee = await this.prisma.employee.findUnique({
       where: { id: dto.employeeId },
@@ -24,7 +31,7 @@ export class InsuranceService {
     return this.prisma.insurance.create({ data: dto });
   }
 
-  async findAll(role?: string, employeeId?: string) {
+  async findAll(user?: any, role?: string, employeeId?: string) {
     if (role === 'EMPLOYEE' && employeeId) {
       // Only return the logged-in employee's insurance records
       return this.prisma.insurance.findMany({
@@ -58,8 +65,14 @@ export class InsuranceService {
       });
     }
 
-    // Default: admin or HR gets everything
+    // If user is not MD/CAO, hide MD/CAO insurance records
+    const where = this.shouldHideMDCAO(user)
+      ? ({ employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : undefined;
+
+    // Default: admin or HR gets everything (except MD/CAO if not MD/CAO themselves)
     return this.prisma.insurance.findMany({
+      where,
       select: {
         id: true,
         policyNumber: true,
@@ -89,12 +102,18 @@ export class InsuranceService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: any) {
     const insurance = await this.prisma.insurance.findUnique({
       where: { id },
-      include: { employee: true },
+      include: { employee: { include: { user: true } } },
     });
     if (!insurance) throw new NotFoundException('Insurance record not found');
+
+    // If user is not MD/CAO and insurance is for MD/CAO, forbid access
+    if (this.shouldHideMDCAO(user) && insurance.employee?.user?.role && ['MD', 'CAO'].includes(insurance.employee.user.role)) {
+      throw new NotFoundException('Insurance record not found');
+    }
+
     return insurance;
   }
 

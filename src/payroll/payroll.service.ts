@@ -2,16 +2,25 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import {
   getDefaultPayDateForMonth,
   getDefaultPayDateForPeriodDate,
 } from './date.util';
+import { AuthenticatedUser } from '../auth/jwt.strategy';
 
 @Injectable()
 export class PayrollService {
   constructor(private prisma: PrismaService) {}
+
+  // ────────────────
+  // ✅ Helper: Check if should hide MD/CAO employees
+  // ────────────────
+  private shouldHideMDCAO(user: AuthenticatedUser): boolean {
+    return user.role !== 'MD' && user.role !== 'CAO';
+  }
 
   async onModuleInit() {
     await this.ensureCurrentPayrollRun();
@@ -77,7 +86,12 @@ export class PayrollService {
   }
 
   // 🧾 Create a new payroll run
-  async startRun(periodStart: string, periodEnd: string, payDate: string) {
+  async startRun(
+    periodStart: string,
+    periodEnd: string,
+    payDate: string,
+    user: AuthenticatedUser,
+  ) {
     if (!periodStart || !periodEnd || !payDate) {
       throw new BadRequestException(
         'All fields (periodStart, periodEnd, payDate) are required.',
@@ -95,14 +109,14 @@ export class PayrollService {
   }
 
   // 📊 Get all payroll runs
-  async getRuns() {
+  async getRuns(user: AuthenticatedUser) {
     return this.prisma.payrollRun.findMany({
       orderBy: { createdAt: 'desc' },
     });
   }
 
   // 🔍 Get single payroll run by ID
-  async getRun(id: string) {
+  async getRun(id: string, user: AuthenticatedUser) {
     const run = await this.prisma.payrollRun.findUnique({
       where: { id },
     });
@@ -111,7 +125,11 @@ export class PayrollService {
   }
 
   // ✏️ Update payroll run (e.g., change payDate)
-  async updateRun(id: string, data: { payDate?: string }) {
+  async updateRun(
+    id: string,
+    data: { payDate?: string },
+    user: AuthenticatedUser,
+  ) {
     const run = await this.prisma.payrollRun.findUnique({
       where: { id },
     });
@@ -253,12 +271,13 @@ export class PayrollService {
   }
 
   // 🧮 Publish payroll run (auto-generate for all employees)
-  async publish(runId: string) {
+  async publish(runId: string, user: AuthenticatedUser) {
     const run = await this.prisma.payrollRun.findUnique({
       where: { id: runId },
     });
     if (!run) throw new BadRequestException(`Payroll run ${runId} not found`);
 
+    // Get all employees
     const employees = await this.prisma.employee.findMany({
       include: { compensation: true },
     });
@@ -291,9 +310,15 @@ export class PayrollService {
     });
   }
 
-  // 📜 Get all payslips (Admin / HR / Manager)
-  async getPayslips() {
+  // 📜 Get all payslips (Admin / HR / Manager / MD / CAO)
+  async getPayslips(user: AuthenticatedUser) {
+    // If user is not MD/CAO, hide MD/CAO payslips
+    const where = this.shouldHideMDCAO(user)
+      ? ({ employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : undefined;
+
     const payslips = await this.prisma.payslip.findMany({
+      where,
       include: {
         employee: {
           include: {
@@ -319,7 +344,7 @@ export class PayrollService {
   }
 
   // 🔍 Get one payslip by ID
-  async getPayslip(id: string) {
+  async getPayslip(id: string, user: AuthenticatedUser) {
     const payslip = await this.prisma.payslip.findUnique({
       where: { id },
       include: {
@@ -335,6 +360,12 @@ export class PayrollService {
     });
 
     if (!payslip) throw new NotFoundException(`Payslip ${id} not found`);
+
+    // If user is not MD/CAO and payslip is for MD/CAO, forbid access
+    if (this.shouldHideMDCAO(user) && payslip.employee.user?.role && ['MD', 'CAO'].includes(payslip.employee.user.role)) {
+      throw new ForbiddenException('Not authorized to view this payslip');
+    }
+
     // console.log("🧾 Single Payslip Debug:", JSON.stringify(payslip, null, 2));
     return payslip;
   }
@@ -418,5 +449,52 @@ export class PayrollService {
     });
 
     return payslips;
+  }
+
+  // 🗑️ Delete a payroll run
+  async deleteRun(id: string, user: AuthenticatedUser) {
+    const run = await this.prisma.payrollRun.findUnique({
+      where: { id },
+      include: { payslips: true },
+    });
+
+    if (!run) {
+      throw new NotFoundException('Payroll run not found');
+    }
+
+    // Check if the run has associated payslips
+    if (run.payslips && run.payslips.length > 0) {
+      throw new BadRequestException(
+        'Cannot delete payroll run with associated payslips. Delete payslips first.',
+      );
+    }
+
+    await this.prisma.payrollRun.delete({
+      where: { id },
+    });
+
+    return { message: 'Payroll run deleted successfully', id };
+  }
+
+  // 🗑️ Delete a payslip
+  async deletePayslip(id: string, user: AuthenticatedUser) {
+    const payslip = await this.prisma.payslip.findUnique({
+      where: { id },
+      include: {
+        employee: {
+          include: { user: true },
+        },
+      },
+    });
+
+    if (!payslip) {
+      throw new NotFoundException('Payslip not found');
+    }
+
+    await this.prisma.payslip.delete({
+      where: { id },
+    });
+
+    return { message: 'Payslip deleted successfully', id };
   }
 }

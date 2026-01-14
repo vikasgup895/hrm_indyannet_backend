@@ -21,16 +21,80 @@ async function main() {
       role: Role.ADMIN,
     },
   });
+  console.log('✅ Admin user created');
+
+  // 🔹 Ensure CAO user
   await p.user.upsert({
     where: { email: 'pavithra@indyanet.com' },
     update: {},
     create: {
       email: 'pavithra@indyanet.com',
       passwordHash: adminPass,
-      role: Role.ADMIN,
+      role: Role.CAO,
     },
   });
-  console.log('✅ 2 Admin users created');
+  console.log('✅ CAO user created');
+
+  // 🔹 Ensure MD user
+  await p.user.upsert({
+    where: { email: 'devanath@indyanet.com' },
+    update: {},
+    create: {
+      email: 'devanath@indyanet.com',
+      passwordHash: adminPass,
+      role: Role.MD,
+    },
+  });
+  console.log('✅ MD user created');
+
+  // 🔹 Create Employee records for executive users
+  const caoUser = await p.user.findUnique({
+    where: { email: 'pavithra@indyanet.com' },
+  });
+  
+  const mdUser = await p.user.findUnique({
+    where: { email: 'devanath@indyanet.com' },
+  });
+
+  if (caoUser) {
+    await p.employee.upsert({
+      where: { personNo: 'EMP-CAO-001' },
+      update: {},
+      create: {
+        personNo: 'EMP-CAO-001',
+        firstName: 'Pavithra',
+        lastName: 'K',
+        workEmail: 'pavithra@indyanet.com',
+        hireDate: new Date('2020-01-01'),
+        department: 'Executive',
+        location: 'Bangalore',
+        status: 'Active',
+        designation: 'Chief Administrative Officer',
+        userId: caoUser.id,
+      },
+    });
+    console.log('✅ CAO employee record created');
+  }
+
+  if (mdUser) {
+    await p.employee.upsert({
+      where: { personNo: 'EMP-MD-001' },
+      update: {},
+      create: {
+        personNo: 'EMP-MD-001',
+        firstName: 'Devanath',
+        lastName: 'S',
+        workEmail: 'devanath@indyanet.com',
+        hireDate: new Date('2019-01-01'),
+        department: 'Executive',
+        location: 'Bangalore',
+        status: 'Active',
+        designation: 'Managing Director',
+        userId: mdUser.id,
+      },
+    });
+    console.log('✅ MD employee record created');
+  }
 
   // 🔹 EMPLOYEES
 

@@ -9,10 +9,17 @@ import { PrismaService } from '../prisma.service';
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
+  // ────────────────
+  // ✅ Helper: Check if should hide MD/CAO employees
+  // ────────────────
+  private shouldHideMDCAO(user?: any): boolean {
+    return !user || (user.role !== 'MD' && user.role !== 'CAO');
+  }
+
   /* ────────────────────────────────
-      ADMIN / HR DASHBOARD
+      ADMIN / HR / MD / CAO DASHBOARD
   ──────────────────────────────── */
-  async getDashboardData() {
+  async getDashboardData(user?: any) {
     const [
       totalEmployees,
       upcomingBirthdays,
@@ -25,16 +32,16 @@ export class DashboardService {
       pendingPayrolls,
       departmentCounts,
     ] = await Promise.all([
-      this.getTotalEmployees(),
-      this.getUpcomingBirthdays(),
-      this.getNewJoiners(),
-      this.getDepartingMembers(),
-      this.getWorkAnniversaries(),
+      this.getTotalEmployees(user),
+      this.getUpcomingBirthdays(user),
+      this.getNewJoiners(user),
+      this.getDepartingMembers(user),
+      this.getWorkAnniversaries(user),
       this.getUpcomingHolidays(),
-      this.getLeaveAvailability(),
-      this.getActiveLeaveRequests(),
-      this.getPendingPayrolls(),
-      this.getDepartmentCounts(),
+      this.getLeaveAvailability(user),
+      this.getActiveLeaveRequests(user),
+      this.getPendingPayrolls(user),
+      this.getDepartmentCounts(user),
     ]);
 
     return {
@@ -53,17 +60,24 @@ export class DashboardService {
     };
   }
 
-  private async getTotalEmployees(): Promise<number> {
-    return this.prisma.employee.count({ where: { status: 'Active' } });
+  private async getTotalEmployees(user?: any): Promise<number> {
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status: 'Active', user: { role: { notIn: ['MD', 'CAO'] } } } as any)
+      : { status: 'Active' };
+    return this.prisma.employee.count({ where });
   }
 
-  private async getUpcomingBirthdays() {
+  private async getUpcomingBirthdays(user?: any) {
     const today = new Date();
     const nextMonth = new Date(today);
     nextMonth.setMonth(today.getMonth() + 1);
 
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status: 'Active', birthdate: { not: null }, user: { role: { notIn: ['MD', 'CAO'] } } } as any)
+      : { status: 'Active', birthdate: { not: null } };
+
     const employees = await this.prisma.employee.findMany({
-      where: { status: 'Active', birthdate: { not: null } },
+      where,
       select: { id: true, firstName: true, lastName: true, birthdate: true },
     });
 
@@ -98,12 +112,16 @@ export class DashboardService {
       .slice(0, 5);
   }
 
-  private async getNewJoiners() {
+  private async getNewJoiners(user?: any) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status: 'Active', hireDate: { gte: thirtyDaysAgo }, user: { role: { notIn: ['MD', 'CAO'] } } } as any)
+      : { status: 'Active', hireDate: { gte: thirtyDaysAgo } };
+
     const employees = await this.prisma.employee.findMany({
-      where: { status: 'Active', hireDate: { gte: thirtyDaysAgo } },
+      where,
       select: {
         id: true,
         firstName: true,
@@ -128,13 +146,17 @@ export class DashboardService {
     }));
   }
 
-  private async getDepartingMembers() {
+  private async getDepartingMembers(user?: any) {
     const today = new Date();
     const nextMonth = new Date();
     nextMonth.setMonth(today.getMonth() + 1);
 
+    const where = this.shouldHideMDCAO(user)
+      ? ({ terminationDate: { gte: today, lte: nextMonth }, user: { role: { notIn: ['MD', 'CAO'] } } } as any)
+      : { terminationDate: { gte: today, lte: nextMonth } };
+
     const employees = await this.prisma.employee.findMany({
-      where: { terminationDate: { gte: today, lte: nextMonth } },
+      where,
       select: {
         id: true,
         firstName: true,
@@ -159,11 +181,15 @@ export class DashboardService {
     }));
   }
 
-  private async getWorkAnniversaries() {
+  private async getWorkAnniversaries(user?: any) {
     const today = new Date();
 
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status: 'Active', user: { role: { notIn: ['MD', 'CAO'] } } } as any)
+      : { status: 'Active' };
+
     const employees = await this.prisma.employee.findMany({
-      where: { status: 'Active' },
+      where,
       select: { id: true, firstName: true, lastName: true, hireDate: true },
     });
 
@@ -229,11 +255,15 @@ export class DashboardService {
     }));
   }
 
-  private async getLeaveAvailability() {
+  private async getLeaveAvailability(user?: any) {
     const currentMonth = new Date().toISOString().slice(0, 7);
 
+    const where = this.shouldHideMDCAO(user)
+      ? ({ period: currentMonth, employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : { period: currentMonth };
+
     const balances = await this.prisma.leaveBalance.findMany({
-      where: { period: currentMonth },
+      where,
     });
 
     const totalAllotted = balances.reduce((s, b) => s + b.allotted, 0);
@@ -249,18 +279,26 @@ export class DashboardService {
     };
   }
 
-  private async getActiveLeaveRequests() {
-    return this.prisma.leaveRequest.count({ where: { status: 'PENDING' } });
+  private async getActiveLeaveRequests(user?: any): Promise<number> {
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status: 'PENDING', employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : { status: 'PENDING' };
+    return this.prisma.leaveRequest.count({ where });
   }
 
-  private async getPendingPayrolls() {
+  private async getPendingPayrolls(user?: any): Promise<number> {
+    // Don't filter payroll runs by user role - just count DRAFT runs
     return this.prisma.payrollRun.count({ where: { status: 'DRAFT' } });
   }
 
-  private async getDepartmentCounts() {
+  private async getDepartmentCounts(user?: any) {
+    const where = this.shouldHideMDCAO(user)
+      ? ({ status: 'Active', department: { not: null }, user: { role: { notIn: ['MD', 'CAO'] } } } as any)
+      : { status: 'Active', department: { not: null } };
+
     const departments = await this.prisma.employee.groupBy({
       by: ['department'],
-      where: { status: 'Active', department: { not: null } },
+      where,
       _count: { id: true },
       orderBy: { _count: { id: 'desc' } },
       take: 10,

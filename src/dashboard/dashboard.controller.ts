@@ -16,13 +16,13 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   /**
-   * 📊 ADMIN / HR / MANAGER DASHBOARD
+   * 📊 ADMIN / HR / MANAGER / MD / CAO DASHBOARD
    * Route: GET /dashboard/data
    */
-  @Roles('ADMIN', 'HR', 'MANAGER')
+  @Roles('ADMIN', 'HR', 'MANAGER', 'MD', 'CAO')
   @Get('data')
-  async getAdminDashboard() {
-    return this.dashboardService.getDashboardData();
+  async getAdminDashboard(@Req() req: any) {
+    return this.dashboardService.getDashboardData(req.user);
   }
 
   /**

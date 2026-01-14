@@ -62,18 +62,18 @@ export class LeaveController {
   }
 
   // ---------------------------------------------------------------------------
-  // 👑 ADMIN/HR — Create new leave policy
+  // 👑 ADMIN/HR/MD/CAO — Create new leave policy
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post('policy')
   async createPolicy(@Body() dto: any) {
     return this.svc.createPolicy(dto);
   }
 
   // ---------------------------------------------------------------------------
-  // 👑 ADMIN/HR — Assign leave balances
+  // 👑 ADMIN/HR/MD/CAO — Assign leave balances
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post('assign')
   async assignLeave(@Req() req: any, @Body() dto: any) {
     const userRole = req.user.role;
@@ -81,45 +81,45 @@ export class LeaveController {
   }
 
   // ---------------------------------------------------------------------------
-  // 🕓 ADMIN/HR — Undo last batch assignment
+  // 🕓 ADMIN/HR/MD/CAO — Undo last batch assignment
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post('assign/:batchId/undo')
   async undoAssignment(@Param('batchId') batchId: string) {
     return this.svc.undoLastAssignment(batchId);
   }
 
   // ---------------------------------------------------------------------------
-  // ♻️ ADMIN/HR — Trigger carry-forward manually
+  // ♻️ ADMIN/HR/MD/CAO — Trigger carry-forward manually
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post('carry-forward')
   async triggerCarryForward() {
     return this.svc.carryForwardLeaves();
   }
 
   // ---------------------------------------------------------------------------
-  // 📊 ADMIN/HR — Get all leave requests
+  // 📊 ADMIN/HR/MD/CAO — Get all leave requests
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Get('all')
-  async getAllLeaveRequests() {
-    return this.svc.getAllLeaveRequests();
+  async getAllLeaveRequests(@Req() req: any) {
+    return this.svc.getAllLeaveRequests(req.user);
   }
 
   // ---------------------------------------------------------------------------
-  // 📅 ADMIN/HR — Get all leave balances
+  // 📅 ADMIN/HR/MD/CAO — Get all leave balances
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Get('balances/all')
-  async getAllBalances() {
-    return this.svc.getAllBalances();
+  async getAllBalances(@Req() req: any) {
+    return this.svc.getAllBalances(req.user);
   }
 
   // ---------------------------------------------------------------------------
-  // ✅ ADMIN/HR — Approve leave
+  // ✅ ADMIN/HR/MD/CAO — Approve leave
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Put(':id/approve')
   async approveLeave(
     @Param('id') id: string,
@@ -130,9 +130,9 @@ export class LeaveController {
   }
 
   // ---------------------------------------------------------------------------
-  // ❌ ADMIN/HR — Reject leave
+  // ❌ ADMIN/HR/MD/CAO — Reject leave
   // ---------------------------------------------------------------------------
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Put(':id/reject')
   async rejectLeave(
     @Param('id') id: string,

@@ -41,9 +41,9 @@ export class ConvenienceChargeController {
   /**
    * 📋 Get convenience charges for an employee
    * EMPLOYEE: own charges only
-   * ADMIN/HR: any employee's charges
+   * ADMIN/HR/MD/CAO: any employee's charges
    */
-  @Roles('ADMIN', 'HR', 'EMPLOYEE')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO', 'EMPLOYEE')
   @Get('employee/:employeeId')
   async findByEmployeeId(
     @Param('employeeId') employeeId: string,
@@ -58,23 +58,26 @@ export class ConvenienceChargeController {
   }
 
   /**
-   * 📋 Get ALL PENDING charges (HR/Admin review list)
+   * 📋 Get ALL PENDING charges (HR/Admin/MD/CAO review list)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Get('pending/all')
-  async getPendingCharges() {
-    return this.convenienceChargeService.getPendingCharges();
+  async getPendingCharges(@Req() req: Request) {
+    const user = req.user as any;
+    return this.convenienceChargeService.getPendingCharges(user);
   }
 
   /**
    * 📋 Get charges by status (PENDING, APPROVED, REJECTED)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Get('status/:status')
   async getChargesByStatus(
     @Param('status') status: 'PENDING' | 'APPROVED' | 'REJECTED',
+    @Req() req: Request,
   ) {
-    return this.convenienceChargeService.getChargesByStatus(status);
+    const user = req.user as any;
+    return this.convenienceChargeService.getChargesByStatus(status, user);
   }
 
   /**
@@ -96,9 +99,9 @@ export class ConvenienceChargeController {
   }
 
   /**
-   * ✅ HR/Admin approves or rejects a charge
+   * ✅ HR/Admin/MD/CAO approves or rejects a charge
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Put('approve/:chargeId')
   async approveCharge(
     @Param('chargeId') chargeId: string,
@@ -131,18 +134,18 @@ export class ConvenienceChargeController {
   }
 
   /**
-   * 🗑 HR/Admin deletes any charge (usually only PENDING)
+   * 🗑 HR/Admin/MD/CAO deletes any charge (usually only PENDING)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Delete(':chargeId')
   async deleteCharge(@Param('chargeId') chargeId: string) {
     return this.convenienceChargeService.remove(chargeId);
   }
 
   /**
-   * [LEGACY] 🧾 Create a new convenience charge (ADMIN/HR only)
+   * [LEGACY] 🧾 Create a new convenience charge (ADMIN/HR/MD/CAO only)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Post()
   create(@Body() dto: CreateConvenienceChargeDto) {
     return this.convenienceChargeService.create(dto);
@@ -151,16 +154,17 @@ export class ConvenienceChargeController {
   /**
    * 🔍 Get a specific convenience charge by ID
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Get('charge/:id')
-  findOne(@Param('id') id: string) {
-    return this.convenienceChargeService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as any;
+    return this.convenienceChargeService.findOne(id, user);
   }
 
   /**
-   * 🧩 Update a convenience charge (ADMIN/HR only)
+   * 🧩 Update a convenience charge (ADMIN/HR/MD/CAO only)
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateConvenienceChargeDto) {
     return this.convenienceChargeService.update(id, dto);
@@ -171,7 +175,7 @@ export class ConvenienceChargeController {
    * Format: { chargeId1: 'APPROVED', chargeId2: 'REJECTED', ... }
    * With optional rejectionReasons: { chargeId2: 'Insufficient proof', ... }
    */
-  @Roles('ADMIN', 'HR')
+  @Roles('ADMIN', 'HR', 'MD', 'CAO')
   @Put('bulk/approve-reject')
   async bulkApproveCharges(
     @Body()

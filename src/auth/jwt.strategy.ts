@@ -4,14 +4,14 @@ import { ExtractJwt, Strategy, JwtFromRequestFunction } from 'passport-jwt';
 
 export interface JwtPayload {
   sub: string;
-  role: 'EMPLOYEE' | 'HR' | 'ADMIN';
+  role: 'EMPLOYEE' | 'HR' | 'ADMIN' | 'MD' | 'CAO';
   email?: string;
   employeeId?: string;
 }
 
 export interface AuthenticatedUser {
   sub: string;
-  role: 'EMPLOYEE' | 'HR' | 'ADMIN';
+  role: 'EMPLOYEE' | 'HR' | 'ADMIN' | 'MD' | 'CAO';
   email?: string;
   employeeId?: string;
 }
@@ -36,7 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * Ensures consistent user object structure:
    * {
    *   sub: string (user ID);
-   *   role: "EMPLOYEE" | "HR" | "ADMIN";
+   *   role: "EMPLOYEE" | "HR" | "ADMIN" | "MD" | "CAO";
    *   email?: string;
    *   employeeId?: string;
    * }

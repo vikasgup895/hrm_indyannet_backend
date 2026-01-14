@@ -694,6 +694,13 @@ import { addMonths, getMonth } from 'date-fns';
 export class LeaveService {
   constructor(private prisma: PrismaService) {}
 
+  // ────────────────
+  // ✅ Helper: Check if should hide MD/CAO employees
+  // ────────────────
+  private shouldHideMDCAO(user?: any): boolean {
+    return !user || (user.role !== 'MD' && user.role !== 'CAO');
+  }
+
   // ---------------------------------------------------------------------------
   // 🧭 EMPLOYEE: Get leave policies
   // ---------------------------------------------------------------------------
@@ -1096,8 +1103,14 @@ export class LeaveService {
   // ---------------------------------------------------------------------------
   // 📊 ADMIN/HR: Get all leave requests
   // ---------------------------------------------------------------------------
-  async getAllLeaveRequests() {
+  async getAllLeaveRequests(user?: any) {
+    // If user is not MD/CAO, hide MD/CAO leave requests
+    const where = this.shouldHideMDCAO(user)
+      ? ({ employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : undefined;
+
     const requests = await this.prisma.leaveRequest.findMany({
+      where,
       include: {
         employee: {
           select: {
@@ -1126,8 +1139,14 @@ export class LeaveService {
   // ---------------------------------------------------------------------------
   // 📅 ADMIN/HR: Get all balances
   // ---------------------------------------------------------------------------
-  async getAllBalances() {
+  async getAllBalances(user?: any) {
+    // If user is not MD/CAO, hide MD/CAO leave balances
+    const where = this.shouldHideMDCAO(user)
+      ? ({ employee: { user: { role: { notIn: ['MD', 'CAO'] } } } } as any)
+      : undefined;
+
     const balances = await this.prisma.leaveBalance.findMany({
+      where,
       include: {
         employee: {
           select: {
