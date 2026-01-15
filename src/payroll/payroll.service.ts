@@ -10,10 +10,14 @@ import {
   getDefaultPayDateForPeriodDate,
 } from './date.util';
 import { AuthenticatedUser } from '../auth/jwt.strategy';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class PayrollService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   // ────────────────
   // ✅ Helper: Check if should hide MD/CAO employees
@@ -258,6 +262,20 @@ export class PayrollService {
       },
     });
 
+    // 📝 Log payslip creation
+    await this.auditLog.logPayslipCreate(
+      payslip.id,
+      {
+        employeeId: payslip.employeeId,
+        gross: payslip.gross,
+        net: payslip.net,
+        deductions: payslip.deductions,
+        status: payslip.status,
+      },
+      _user?.sub,
+      _user?.role,
+    );
+
     // Update payroll run status to PAID when first payslip is created
     if (run && run.status === 'DRAFT') {
       await this.prisma.payrollRun.update({
@@ -287,7 +305,7 @@ export class PayrollService {
       const net = gross;
       const currency = e.compensation?.currency ?? 'INR';
 
-      await this.prisma.payslip.create({
+      const payslip = await this.prisma.payslip.create({
         data: {
           payrollRunId: runId,
           employeeId: e.id,
@@ -301,6 +319,20 @@ export class PayrollService {
           ],
         },
       });
+
+      // 📝 Log each payslip creation during publish
+      await this.auditLog.logPayslipCreate(
+        payslip.id,
+        {
+          employeeId: payslip.employeeId,
+          gross: payslip.gross,
+          net: payslip.net,
+          deductions: payslip.deductions,
+          status: payslip.status,
+        },
+        user?.sub,
+        user?.role,
+      );
     }
 
     // Update payroll run status to PAID after generating all payslips
@@ -491,9 +523,27 @@ export class PayrollService {
       throw new NotFoundException('Payslip not found');
     }
 
+    // Store the data before deletion for logging
+    const payslipData = {
+      id: payslip.id,
+      employeeId: payslip.employeeId,
+      gross: payslip.gross,
+      net: payslip.net,
+      deductions: payslip.deductions,
+      status: payslip.status,
+    };
+
     await this.prisma.payslip.delete({
       where: { id },
     });
+
+    // 📝 Log payslip deletion
+    await this.auditLog.logPayslipDelete(
+      id,
+      payslipData,
+      user?.sub,
+      user?.role,
+    );
 
     return { message: 'Payslip deleted successfully', id };
   }

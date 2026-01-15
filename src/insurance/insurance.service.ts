@@ -9,10 +9,14 @@ import { PrismaService } from '../prisma.service';
 import { CreateInsuranceDto } from './dto/create-insurance.dto';
 import { UpdateInsuranceDto } from './dto/update-insurance.dto';
 import { UpdateFinancialDto } from './dto/update-financial.dto';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class InsuranceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   // ────────────────
   // ✅ Helper: Check if should hide MD/CAO employees
@@ -28,7 +32,22 @@ export class InsuranceService {
 
     if (!employee) throw new NotFoundException('Employee not found');
 
-    return this.prisma.insurance.create({ data: dto });
+    const insurance = await this.prisma.insurance.create({ data: dto });
+
+    // 📝 Log insurance creation
+    await this.auditLog.logInsuranceCreate(
+      insurance.id,
+      {
+        employeeId: insurance.employeeId,
+        policyNumber: insurance.policyNumber,
+        provider: insurance.provider,
+        coverageAmount: insurance.coverageAmount,
+      },
+      undefined,
+      'ADMIN',
+    );
+
+    return insurance;
   }
 
   async findAll(user?: any, role?: string, employeeId?: string) {
@@ -120,13 +139,42 @@ export class InsuranceService {
   async update(id: string, dto: UpdateInsuranceDto) {
     const exists = await this.prisma.insurance.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('Insurance not found');
-    return this.prisma.insurance.update({ where: { id }, data: dto });
+    
+    const oldData = {
+      policyNumber: exists.policyNumber,
+      provider: exists.provider,
+      coverageAmount: exists.coverageAmount,
+    };
+
+    const updated = await this.prisma.insurance.update({ where: { id }, data: dto });
+
+    // 📝 Log insurance update
+    await this.auditLog.logInsuranceUpdate(
+      id,
+      oldData,
+      {
+        policyNumber: updated.policyNumber,
+        provider: updated.provider,
+        coverageAmount: updated.coverageAmount,
+      },
+      undefined,
+      'ADMIN',
+    );
+
+    return updated;
   }
 
   async updateFinancial(id: string, dto: UpdateFinancialDto) {
     const exists = await this.prisma.insurance.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('Insurance not found');
-    return this.prisma.insurance.update({
+    
+    const oldData = {
+      bonusPercent: exists.bonusPercent,
+      eCashAmount: exists.eCashAmount,
+      convenienceFee: exists.convenienceFee,
+    };
+
+    const updated = await this.prisma.insurance.update({
       where: { id },
       data: {
         bonusPercent: dto.bonusPercent,
@@ -134,12 +182,46 @@ export class InsuranceService {
         convenienceFee: dto.convenienceFee,
       },
     });
+
+    // 📝 Log insurance financial update
+    await this.auditLog.logInsuranceUpdate(
+      id,
+      oldData,
+      {
+        bonusPercent: updated.bonusPercent,
+        eCashAmount: updated.eCashAmount,
+        convenienceFee: updated.convenienceFee,
+      },
+      undefined,
+      'ADMIN',
+    );
+
+    return updated;
   }
 
   async remove(id: string) {
     const exists = await this.prisma.insurance.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('Insurance not found');
-    return this.prisma.insurance.delete({ where: { id } });
+    
+    const insuranceData = {
+      id: exists.id,
+      employeeId: exists.employeeId,
+      policyNumber: exists.policyNumber,
+      provider: exists.provider,
+      coverageAmount: exists.coverageAmount,
+    };
+
+    await this.prisma.insurance.delete({ where: { id } });
+
+    // 📝 Log insurance deletion
+    await this.auditLog.logInsuranceDelete(
+      id,
+      insuranceData,
+      undefined,
+      'ADMIN',
+    );
+
+    return { message: 'Insurance record deleted successfully', id };
   }
 
   /**

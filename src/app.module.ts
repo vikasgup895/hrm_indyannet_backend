@@ -9,6 +9,7 @@ import { PayrollModule } from './payroll/payroll.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { InsuranceModule } from './insurance/insurance.module';
 import { MailerModule } from './mailer/mailer.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { MailerModule } from './mailer/mailer.module';
     MailerModule,
     InsuranceModule,
     DashboardModule,
+    AuditLogModule,
   ],
   providers: [PrismaService],
 })

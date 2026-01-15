@@ -308,3 +308,38 @@ model Holiday {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+//
+// ✅ Audit & Logging
+//
+model AuditLog {
+  id            String   @id @default(cuid())
+  module        String   // "PAYSLIP", "INSURANCE", etc.
+  action        String   // "CREATE", "UPDATE", "DELETE"
+  entityType    String   // "Payslip", "Insurance", etc.
+  entityId      String   // ID of the entity being logged
+  employeeId    String?  // ID of the employee affected
+  actorId       String?  // ID of the user performing the action
+  actorRole     String?  // Role of the user performing the action
+  
+  // Store before and after states as JSON for changetracking
+  oldData       Json?    // Previous state (for updates/deletes)
+  newData       Json?    // Current state (for creates/updates)
+  changes       String?  // Detailed summary of what changed
+  
+  ipAddress     String?  // IP address of the requester
+  userAgent     String?  // User agent information
+  
+  status        String   @default("SUCCESS") // SUCCESS, FAILED, WARNING
+  errorMessage  String?  // Error message if action failed
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Index for quick lookups
+  @@index([module])
+  @@index([action])
+  @@index([entityType])
+  @@index([employeeId])
+  @@index([createdAt])
+}
