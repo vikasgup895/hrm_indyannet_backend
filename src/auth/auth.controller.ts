@@ -14,6 +14,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgetPasswordDto } from './dto/forget-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CurrentUser } from './current-user.decorator';
 
 @Controller('auth')
@@ -28,6 +30,26 @@ export class AuthController {
   @HttpCode(200)
   async login(@Body() body: LoginDto): Promise<AuthResponseDto> {
     return this.auth.login(body.email, body.password);
+  }
+
+  /**
+   * 🔐 Forget Password endpoint
+   * Sends a password reset link to the user's email
+   */
+  @Post('forgot-password')
+  @HttpCode(200)
+  async forgetPassword(@Body() body: ForgetPasswordDto) {
+    return this.auth.forgetPassword(body.email);
+  }
+
+  /**
+   * 🔐 Reset Password endpoint
+   * Validates reset token and updates the user's password
+   */
+  @Post('reset-password')
+  @HttpCode(200)
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return this.auth.resetPassword(body.token, body.newPassword);
   }
 
   /**

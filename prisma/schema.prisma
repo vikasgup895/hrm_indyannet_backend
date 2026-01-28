@@ -44,14 +44,16 @@ enum ConvenienceChargeStatus {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  role         Role      @default(EMPLOYEE)
-  employee     Employee?
-  emailSent    Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String
+  role                Role      @default(EMPLOYEE)
+  employee            Employee?
+  emailSent           Boolean   @default(false)
+  resetToken          String?   // Password reset token
+  resetTokenExpiry    DateTime? // Token expiry time
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
 }
 model Employee {
